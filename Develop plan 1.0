@@ -1,0 +1,74 @@
+Design Review
+The design describes a 6-step AI initiative management platform. It's essentially a full-stack web application with:
+
+A structured data store (AI Case Library)
+A submission portal (CRUD forms)
+A browsable/filterable UI
+An analytics dashboard with charts
+A ranking/leaderboard engine
+An AI-powered solution design agent (semantic search + generation)
+It's ambitious but well-scoped. Each step builds on the previous one, which is good for incremental delivery.
+
+Detailed Development Plan
+Phase 1: Project Foundation & Data Layer
+Tech stack recommendation: Python (FastAPI backend) + React frontend + SQLite (or DynamoDB if you want AWS-native). This keeps it hackathon-friendly.
+
+What I'd build:
+
+FastAPI project scaffold with CORS, error handling
+SQLAlchemy models for the Case Library schema (Case ID, Owner Login, Job Level, Program/Team, Use Case Title, Problem Statement, AI Technique, Tools/Services, Key Prompts, Input Data, Output/Outcome, Performance Metrics, Status, Date, Rank)
+Auto-generated fields: Case ID (UUID), Date (timestamp), Rank (computed)
+Database migrations with Alembic
+CRUD API endpoints: POST /cases, GET /cases, GET /cases/{id}, PUT /cases/{id}, DELETE /cases/{id}
+Seed data script with sample cases
+Phase 2: Learner Input Portal (Submission Form)
+React form component with all case fields
+Dropdown selections for categorical fields (AI Technique, Status, Job Level, Program/Team)
+Validation rules: required fields, format checks
+Draft/Save/Submit workflow with status field (draft, submitted, approved)
+API endpoints for draft management: POST /cases/draft, PUT /cases/{id}/submit
+Phase 3: Filterable Browse UI
+Data table component (using something like TanStack Table or AG Grid)
+Multi-column filtering: text search, dropdown filters, date range
+Sorting on every column
+Pagination
+CSV export endpoint: GET /cases/export?format=csv
+API query params: GET /cases?program=X&technique=Y&status=Z&sort=date&order=desc
+Phase 4: Analytics Dashboard
+Dashboard page with chart components (Chart.js or Recharts)
+Charts to build:
+Bar chart: initiatives by Program/Team
+Pie chart: distribution of AI techniques
+Stacked bar: performance metrics (time saved, accuracy, cost reduction)
+Funnel/pipeline: status progression (ideation → POC → production)
+Line chart: submissions over time
+Aggregation API endpoints: GET /analytics/by-program, GET /analytics/by-technique, GET /analytics/by-status, GET /analytics/trends
+Drill-down: clicking a chart segment filters the browse view
+Phase 5: Ranking Engine
+Weighted scoring algorithm:
+Impact (40%): time saved + cost reduction + accuracy gain
+Scalability (25%): reusability score
+Complexity vs Effort (20%): inverse of effort-to-impact ratio
+Innovation (15%): novelty factor
+API: GET /rankings?weights=impact:40,scalability:25,complexity:20,innovation:15
+Leaderboard UI component with configurable weight sliders
+Side-by-side comparison view for top initiatives
+Rank auto-updates when weights change
+Phase 6: AI Solution Design Agent
+Embedding generation for all cases (using Amazon Bedrock or OpenAI)
+Vector store for semantic search (FAISS or pgvector)
+Agent endpoint: POST /agent/design
+Input: problem description text
+Process: embed query → find top-K similar cases → generate solution design via LLM
+Output: suggested techniques, reference cases, estimated effort, implementation steps
+Conversational follow-up support via session tracking
+Prompt engineering for structured output
+Estimated Timeline (Hackathon pace)
+Phase	Effort
+Phase 1: Foundation & Data	~2-3 hours
+Phase 2: Input Portal	~2-3 hours
+Phase 3: Browse UI	~2-3 hours
+Phase 4: Analytics	~3-4 hours
+Phase 5: Ranking	~2-3 hours
+Phase 6: AI Agent	~4-5 hours
+Total: roughly 15-21 hours of focused development.

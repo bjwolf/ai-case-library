@@ -15,3 +15,16 @@ Tech stack (I suggested FastAPI + React + SQLite — good with that)
 Simple/local solution
 Any specific UI framework preference - Ant Design
 
+
+
+AI Hackathon/backend/
+├── app/
+│   ├── __init__.py
+│   ├── database.py      # SQLite + SQLAlchemy setup
+│   ├── models.py        # Case model with all fields from the design
+│   ├── schemas.py       # Pydantic schemas (Create, Update, Response)
+│   ├── crud.py          # CRUD operations with filtering/sorting
+│   └── main.py          # FastAPI app with all endpoints
+├── requirements.txt
+├── seed_data.py         # 5 sample AI initiative cases
+└── ai_case_library.db   # SQLite database (auto-created)

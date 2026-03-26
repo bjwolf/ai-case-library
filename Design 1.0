@@ -1,0 +1,369 @@
+# AI Ascent Hackathon — Detailed Design Document v1.0
+
+## 1. Overview
+
+### 1.1 Problem Statement
+Teams across the organization are independently exploring AI automation opportunities, but there is no centralized system to capture, share, rank, and learn from these initiatives. Knowledge stays siloed, effort gets duplicated, and leadership lacks visibility into the AI adoption landscape.
+
+### 1.2 Solution Summary
+Build an end-to-end AI Initiative Management Platform with six integrated components:
+1. AI Case Library (structured knowledge base)
+2. Learner Input Portal (submission interface)
+3. Filterable Browse UI (discovery and search)
+4. Analytics Dashboard (insights and trends)
+5. Ranking Engine (scoring and leaderboard)
+6. AI Solution Design Agent (intelligent recommendation)
+
+### 1.3 Target Users
+- Individual contributors submitting AI initiatives
+- Program managers tracking team-level AI adoption
+- Leadership reviewing aggregate metrics and top initiatives
+- New learners seeking inspiration and guidance for AI projects
+
+---
+
+## 2. Architecture
+
+### 2.1 High-Level Architecture
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Frontend (React/Next.js)              │
+│  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌────────────┐ │
+│  │  Input    │ │  Browse  │ │Dashboard │ │  AI Agent  │ │
+│  │  Portal   │ │  UI      │ │          │ │  Chat UI   │ │
+│  └────┬─────┘ └────┬─────┘ └────┬─────┘ └─────┬──────┘ │
+└───────┼────────────┼────────────┼──────────────┼────────┘
+        │            │            │              │
+┌───────▼────────────▼────────────▼──────────────▼────────┐
+│                    API Gateway (REST)                     │
+└───────┬────────────┬────────────┬──────────────┬────────┘
+        │            │            │              │
+┌───────▼──────┐ ┌───▼──────┐ ┌──▼───────┐ ┌───▼────────┐
+│  CRUD API    │ │ Query &  │ │Analytics │ │ AI Agent   │
+│  (Submit/    │ │ Filter   │ │ Engine   │ │ Service    │
+│   Edit/Del)  │ │ Service  │ │          │ │ (Bedrock)  │
+└───────┬──────┘ └───┬──────┘ └──┬───────┘ └───┬────────┘
+        │            │           │              │
+┌───────▼────────────▼───────────▼──────────────▼────────┐
+│                    Data Layer                            │
+│  ┌──────────────┐  ┌──────────────┐  ┌───────────────┐ │
+│  │  DynamoDB /   │  │  Vector DB   │  │  S3 (exports, │ │
+│  │  RDS (cases)  │  │  (embeddings)│  │  attachments) │ │
+│  └──────────────┘  └──────────────┘  └───────────────┘ │
+└─────────────────────────────────────────────────────────┘
+```
+
+### 2.2 Technology Choices
+| Component | Technology | Rationale |
+|-----------|-----------|-----------|
+| Frontend | React + Next.js | Fast iteration, SSR for dashboards |
+| API | API Gateway + Lambda (or Express) | Serverless, scales to zero |
+| Primary DB | DynamoDB | Flexible schema, low-latency reads |
+| Vector Store | OpenSearch / Bedrock Knowledge Base | Semantic search for AI Agent |
+| AI/ML | Amazon Bedrock (Claude) | Managed LLM, RAG support |
+| Analytics | QuickSight or embedded charts (Recharts) | Interactive visualizations |
+| Auth | Cognito / Midway | SSO integration |
+| Storage | S3 | CSV exports, file attachments |
+
+---
+
+## 3. Component Designs
+
+### 3.1 AI Case Library (Data Model)
+
+#### Schema
+
+
+| Field | Type | Constraints | Notes |
+|-------|------|-------------|-------|
+| case_id | String (UUID) | PK, auto-generated | Format: `AI-YYYYMMDD-XXXX` |
+| owner_login | String | Required | Submitter's login ID |
+| job_level | Enum | Required | L4–L10 dropdown |
+| program_team | String | Required | Free text with autocomplete from existing values |
+| use_case_title | String | Required, max 200 chars | Short descriptive title |
+| problem_statement | Text | Required, max 2000 chars | What problem does this solve? |
+| ai_technique | Enum[] | Required, multi-select | Values: GenAI, ML Classification, NLP, Computer Vision, RAG, Agentic AI, RPA, Other |
+| tools_services | String[] | Optional, multi-select | e.g. Bedrock, SageMaker, Q Developer, PartyRock, Lambda, etc. |
+| key_prompts | Text | Optional, max 5000 chars | Actual prompts or prompt templates used |
+| input_data | Text | Optional, max 2000 chars | Description of input data sources |
+| output_outcome | Text | Required, max 2000 chars | What the solution produces |
+| time_saved_hours | Number | Optional | Estimated hours saved per week/month |
+| accuracy_pct | Number | Optional | Accuracy improvement percentage |
+| cost_reduction_pct | Number | Optional | Cost reduction percentage |
+| status | Enum | Required | Values: Ideation, POC, Pilot, Production, Deprecated |
+| created_date | DateTime | Auto-generated | ISO 8601 |
+| updated_date | DateTime | Auto-generated | ISO 8601 |
+| rank_score | Number | Auto-calculated | Composite score from ranking engine |
+| tags | String[] | Optional | Free-form tags for discoverability |
+| attachments | String[] | Optional | S3 keys for uploaded files |
+
+#### Data Seeding
+- Import existing AI initiatives from spreadsheets, wikis, and team retrospectives
+- Normalize field values (e.g., standardize team names, technique labels)
+- Generate embeddings for `problem_statement` + `use_case_title` + `output_outcome` for semantic search
+
+---
+
+### 3.2 Learner Input Portal
+
+#### User Flow
+```
+[Landing Page] → [New Initiative Form] → [Draft/Save] → [Preview] → [Submit]
+                                              ↓
+                                        [My Submissions] → [Edit] / [Delete]
+```
+
+#### Form Design
+- Progressive disclosure: show required fields first, optional fields in expandable sections
+- Field-level validation with inline error messages
+- Auto-save drafts every 30 seconds
+- Rich text editor for `problem_statement`, `output_outcome`, `key_prompts`
+- File upload for attachments (max 10MB per file, 5 files per submission)
+
+#### Validation Rules
+| Field | Rule |
+|-------|------|
+| owner_login | Auto-populated from auth session, read-only |
+| use_case_title | Required, 10–200 characters |
+| problem_statement | Required, 50–2000 characters |
+| ai_technique | At least one selection required |
+| status | Required, default "Ideation" |
+| time_saved_hours | If provided, must be > 0 |
+| accuracy_pct | If provided, must be 0–100 |
+| cost_reduction_pct | If provided, must be 0–100 |
+
+#### API Endpoints
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/initiatives` | Create new initiative (draft or submitted) |
+| PUT | `/api/initiatives/{id}` | Update existing initiative |
+| DELETE | `/api/initiatives/{id}` | Soft-delete initiative |
+| GET | `/api/initiatives/{id}` | Get single initiative |
+| GET | `/api/initiatives/mine` | List current user's initiatives |
+
+---
+
+### 3.3 Filterable Browse UI
+
+#### Features
+- Server-side paginated table (default 25 rows per page)
+- Column sorting (click header to toggle asc/desc)
+- Multi-field filter panel (sidebar or top bar):
+  - Text search across title + problem statement (full-text)
+  - Dropdown filters: program_team, ai_technique, status, job_level
+  - Range filters: time_saved_hours, accuracy_pct, cost_reduction_pct
+  - Date range filter: created_date
+- Saved filter presets (per user)
+- Export current filtered view to CSV
+- Click-through to initiative detail page
+
+#### API Endpoints
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/initiatives` | List with query params for filtering, sorting, pagination |
+| GET | `/api/initiatives/export` | Export filtered results as CSV (streamed from S3) |
+
+#### Query Parameters
+```
+?search=text&program=X&technique=GenAI&status=POC
+&sort=rank_score&order=desc&page=1&limit=25
+```
+
+---
+
+### 3.4 Analytics Dashboard
+
+#### Dashboard Panels
+
+1. Overview Cards (top row)
+   - Total initiatives count
+   - Initiatives by status (pie/donut chart)
+   - Average time saved across all initiatives
+   - Top AI technique (most used)
+
+2. By Program/Team (bar chart)
+   - X-axis: program/team names
+   - Y-axis: count of initiatives
+   - Color-coded by status
+   - Click to drill down into team's initiatives
+
+3. AI Technique Distribution (horizontal bar or treemap)
+   - Count per technique
+   - Filterable by status
+
+4. Performance Metrics (scatter plot)
+   - X-axis: time_saved_hours
+   - Y-axis: accuracy_pct
+   - Bubble size: cost_reduction_pct
+   - Hover for initiative details
+
+5. Pipeline Funnel (funnel chart)
+   - Ideation → POC → Pilot → Production
+   - Show conversion rates between stages
+
+6. Trend Over Time (line chart)
+   - Monthly submission count
+   - Stacked by status or technique
+
+#### Data Refresh
+- Real-time for card counts (query on load)
+- Dashboard data cached for 5 minutes for chart aggregations
+- Manual refresh button available
+
+---
+
+### 3.5 Ranking Engine
+
+#### Scoring Formula
+```
+rank_score = (w1 × impact_score) + (w2 × scalability_score) + 
+             (w3 × efficiency_score) + (w4 × innovation_score)
+```
+
+#### Score Components
+
+| Component | Calculation | Default Weight |
+|-----------|------------|----------------|
+| Impact Score (0–100) | Normalized composite of: time_saved_hours (40%), accuracy_pct (30%), cost_reduction_pct (30%) | w1 = 0.35 |
+| Scalability Score (0–100) | Based on: number of teams that could reuse (manual tag or AI-inferred), breadth of ai_technique applicability | w2 = 0.25 |
+| Efficiency Score (0–100) | Inverse of estimated implementation effort vs. measured impact. Higher score = more bang for buck | w3 = 0.20 |
+| Innovation Score (0–100) | Novelty factor: uniqueness of technique+problem combination relative to existing library entries (cosine distance from nearest neighbor in vector space) | w4 = 0.20 |
+
+#### Leaderboard Features
+- Default view: top 20 initiatives by rank_score
+- Configurable weights via slider UI (recalculates in real-time)
+- Side-by-side comparison: select 2–3 initiatives to compare across all fields
+- Filter leaderboard by program, technique, status
+- Badge system: "Top 10", "Most Innovative", "Highest Impact"
+
+#### Recalculation
+- Rank scores recalculated nightly via scheduled job
+- On-demand recalculation when weights are adjusted in UI (client-side only, not persisted unless admin saves)
+
+---
+
+### 3.6 AI Solution Design Agent
+
+#### Architecture
+```
+User Input (problem description)
+        │
+        ▼
+┌─────────────────────┐
+│  Prompt Construction │ ← System prompt + user query
+└────────┬────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  RAG: Retrieve top-K │ ← Vector search against Case Library embeddings
+│  similar cases       │
+└────────┬────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  LLM Generation      │ ← Bedrock Claude with retrieved context
+│  (Solution Design)   │
+└────────┬────────────┘
+         │
+         ▼
+┌─────────────────────┐
+│  Structured Output   │ → Technique, tools, reference cases,
+│                      │   effort estimate, implementation steps
+└─────────────────────┘
+```
+
+#### System Prompt (Core)
+```
+You are an AI Solution Design Agent for the AI Ascent program. 
+Given a user's problem description, you:
+1. Analyze the problem domain and identify the core automation opportunity
+2. Search the AI Case Library for similar solved problems
+3. Recommend an AI solution design including:
+   - Suggested AI technique(s) from: [GenAI, ML Classification, NLP, 
+     Computer Vision, RAG, Agentic AI, RPA]
+   - Recommended tools/services
+   - Reference cases from the library (cite case_id and title)
+   - Estimated effort (T-shirt size: S/M/L/XL)
+   - Expected outcomes (time saved, accuracy, cost impact)
+   - Step-by-step implementation plan
+4. Ask clarifying questions if the problem is ambiguous
+Always ground recommendations in existing case library data when possible.
+Format output in structured markdown.
+```
+
+#### RAG Configuration
+- Embedding model: Amazon Titan Embeddings v2
+- Vector store: OpenSearch Serverless (or Bedrock Knowledge Base)
+- Retrieval: top-5 similar cases by cosine similarity
+- Minimum similarity threshold: 0.65 (below this, note "no close matches found")
+- Context window: include case title, problem statement, technique, tools, outcome for each retrieved case
+
+#### Conversation Flow
+1. User describes their problem/scenario
+2. Agent retrieves similar cases and generates solution design
+3. User can ask follow-up questions to refine:
+   - "What if we need this to work in real-time?"
+   - "Can you suggest a lower-effort alternative?"
+   - "Show me more details on reference case AI-20240315-0042"
+4. Agent maintains conversation context for iterative refinement
+5. User can save the generated design as a new initiative draft
+
+#### API Endpoints
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/agent/chat` | Send message, receive agent response |
+| GET | `/api/agent/sessions/{id}` | Retrieve conversation history |
+| POST | `/api/agent/sessions/{id}/save` | Save design as initiative draft |
+
+---
+
+## 4. Security & Access Control
+
+| Role | Permissions |
+|------|------------|
+| Viewer | Browse initiatives, view dashboard, use AI Agent |
+| Contributor | All Viewer + submit/edit/delete own initiatives |
+| Program Admin | All Contributor + edit any initiative in their program, manage program tags |
+| Platform Admin | Full access, manage weights, manage users, export all data |
+
+- Authentication via Cognito/Midway SSO
+- All API endpoints require valid auth token
+- Row-level security: users can only edit/delete their own submissions (unless admin)
+
+---
+
+## 5. Implementation Phases
+
+### Phase 1 — MVP (Hackathon Scope, 2 days)
+- Data model + DynamoDB table
+- Input portal (create/edit form)
+- Browse UI with basic filtering
+- CSV export
+- Static ranking (manual score input)
+
+### Phase 2 — Enhanced (Post-Hackathon, 2 weeks)
+- Analytics dashboard with charts
+- Automated ranking engine with configurable weights
+- Vector embeddings for case library
+- AI Agent v1 (single-turn recommendations)
+
+### Phase 3 — Production (4–6 weeks)
+- Multi-turn AI Agent with conversation memory
+- SSO integration
+- Role-based access control
+- Saved filters and user preferences
+- Notification system (new initiatives in your program, rank changes)
+- API rate limiting and monitoring
+
+---
+
+## 6. Success Metrics
+
+| Metric | Target |
+|--------|--------|
+| Initiatives submitted in first month | 50+ |
+| Unique users browsing per week | 100+ |
+| AI Agent queries per week | 200+ |
+| Average time to submit an initiative | < 10 minutes |
+| User satisfaction (survey) | > 4.0 / 5.0 |
+| Cross-team initiative reuse | 10%+ of initiatives adopted by another team |

@@ -193,3 +193,85 @@ netsh advfirewall firewall add rule name="AI Case Library" dir=in action=allow p
 - Integrate Midway (Amazon SSO) instead of custom JWT auth
 - Change SECRET_KEY in auth.py to a real random value
 - Consider ECS Fargate for containerized deployment
+
+---
+
+## EC2 Deployment Plan (t3.small, ~$16/month)
+
+### Prerequisites
+- Access to a team AWS dev/sandbox account
+- AWS Console access or CLI configured
+
+### Step 1: Launch EC2 Instance
+1. AWS Console → EC2 → Launch Instance
+2. Settings:
+   - Name: ai-case-library
+   - AMI: Amazon Linux 2023
+   - Instance type: t3.small
+   - Key pair: create new or use existing
+   - Network: team VPC
+   - Security group: SSH (22) from your IP, HTTP (80) from 10.0.0.0/8
+   - Storage: 8 GB gp3
+
+### Step 2: Connect and Install
+```bash
+ssh -i your-key.pem ec2-user@<instance-private-ip>
+sudo yum update -y
+sudo yum install -y python3.11 python3.11-pip git
+```
+
+### Step 3: Deploy the App
+```bash
+git clone https://github.com/bjwolf/ai-case-library.git
+cd ai-case-library/backend
+python3.11 -m pip install -r requirements.txt
+python3.11 seed_data.py
+```
+
+### Step 4: Create Systemd Service (auto-start on boot)
+```bash
+sudo tee /etc/systemd/system/ai-case-library.service << 'EOF'
+[Unit]
+Description=AI Case Library
+After=network.target
+
+[Service]
+User=ec2-user
+WorkingDirectory=/home/ec2-user/ai-case-library/backend
+ExecStart=/usr/bin/python3.11 -m uvicorn app.main:app --host 0.0.0.0 --port 80
+Restart=always
+RestartSec=3
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable ai-case-library
+sudo systemctl start ai-case-library
+```
+
+### Step 5: Verify
+```bash
+sudo systemctl status ai-case-library
+curl http://localhost/health
+```
+
+### Step 6: Access
+Anyone on Amazon corp network: http://<instance-private-ip>/
+
+### Useful Commands
+```bash
+sudo journalctl -u ai-case-library -f    # View logs
+sudo systemctl restart ai-case-library    # Restart after changes
+sudo systemctl stop ai-case-library       # Stop
+```
+
+### Cost Estimate
+| Item | Cost/month |
+|---|---|
+| t3.small 24/7 | ~$15 |
+| 8 GB EBS | ~$0.64 |
+| Internal data transfer | $0 |
+| Total | ~$16 |
+| Business hours only (12h/day weekdays) | ~$5 |

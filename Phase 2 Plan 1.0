@@ -26,3 +26,13 @@ PROGRAMS_TEAMS = [
 
 AI_TECHNIQUES = ["NLP Text Classification", "Time Series Forecasting", "Generative AI (LLM)", "Computer Vision", "Reinforcement Learning", "Anomaly Detection", "Recommendation Systems","Others"]
 STATUSES = ["draft", "submitted", "approved"]
+
+
+AI Hackathon/
+├── backend/
+│   └── app/
+│       ├── constants.py    # NEW — dropdown options (Job Levels, Programs, AI Techniques, Statuses)
+│       └── main.py         # UPDATED — added /cases/options endpoint + static file serving
+├── frontend/
+│   ├── index.html          # NEW — SPA shell loading React + Ant Design from CDN
+│   └── app.jsx             # NEW — Full submission form + browse table

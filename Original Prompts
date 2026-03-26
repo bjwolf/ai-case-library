@@ -4,9 +4,10 @@ AI Hackathon Solution Prompts V1.1
 
 ## Step 1: Build an AI Case Library
 - Create a structured dataset (one row per case) capturing all key fields:
-  - Case ID(auto gen),Owner Login, Job Level, Program/Team, Use Case Title, Problem Statement, AI Technique Used, Tools/Services, Key Prompts, Input Data, Output/Outcome, Performance Metrics (e.g. time saved, accuracy, cost reduction), Status, Date (auto gen), rank (auto gen)
+  - Case ID(auto gen),Owner Login, Job Level, Program/Team, Use Case Title, Problem Statement, AI Technique Used, Tools/Services, Key Prompts, Input Data, Output/Outcome, Performance Metrics (e.g. time saved, accuracy, cost reduction), Status, Date (auto gen), rank (auto gen), 
 - Source cases from existing AI initiatives, POCs, and production deployments
 - Normalize field values for consistent filtering and analysis
+- file based or databased based?
 
 ## Step 2: Build a Learner Input Portal for AI Initiatives
 - Provide a form/interface for learners to submit their own AI initiatives with the same key fields as the Case Library
@@ -26,7 +27,7 @@ AI Hackathon Solution Prompts V1.1
   - Trend analysis: submissions over time
 - Use interactive charts with drill-down capability
 
-## Step 5: Build a Ranking Mechanism
+## Step 5: Build a AI based Ranking Mechanism
 - Score and rank initiatives based on weighted performance criteria:
   - Impact (e.g. time saved, cost reduction, accuracy gain)
   - Scalability (reusability across teams/programs)

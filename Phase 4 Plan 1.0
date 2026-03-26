@@ -1,0 +1,54 @@
+Phase 4: Analytics Dashboard
+
+## Overview
+Build an interactive analytics dashboard tab in the portal that visualizes initiative data with charts and summary cards.
+
+## Summary Cards (top row)
+- Total Initiatives count
+- Total Yearly HC Saved (sum)
+- Total Yearly USD Saved (sum, formatted as currency)
+- Average Accuracy (%)
+- Total Dev Time Hours (sum)
+
+## Charts to Build
+
+### 1. Initiatives by Program/Team (Bar Chart)
+- X-axis: Program/Team names
+- Y-axis: Count of initiatives
+- Color-coded bars
+
+### 2. AI Technique Distribution (Pie/Donut Chart)
+- Segments: each AI Technique
+- Show count and percentage
+
+### 3. Status Pipeline (Bar Chart)
+- X-axis: Developing, UAT, In Production
+- Y-axis: Count of initiatives
+- Color matches status tags (blue, orange, green)
+
+### 4. Performance Metrics by Program (Grouped Bar Chart)
+- X-axis: Program/Team
+- Y-axis: Avg Time Saved %, Avg Cost Reduction %, Avg Accuracy %
+- Three bars per program
+
+### 5. Yearly USD Saved by Program (Horizontal Bar Chart)
+- Y-axis: Program/Team
+- X-axis: Sum of Yearly USD Saved
+- Sorted descending
+
+### 6. Submissions Over Time (Line Chart)
+- X-axis: Month/Week
+- Y-axis: Count of new initiatives
+- Based on date_created field
+
+## Technical Approach
+- Use Chart.js via CDN (no build tools needed)
+- Add backend aggregation endpoints:
+  - GET /analytics/summary — totals and averages
+  - GET /analytics/by-program — counts and metrics grouped by program
+  - GET /analytics/by-technique — counts grouped by AI technique
+  - GET /analytics/by-status — counts grouped by status
+  - GET /analytics/trends — submissions over time (monthly)
+- New "Dashboard" tab in the frontend, only visible to logged-in users
+- Charts are interactive: hover for tooltips with exact values
+- Responsive layout: 2 charts per row on desktop
