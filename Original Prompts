@@ -1,0 +1,46 @@
+AI Hackathon Solution Prompts V1.1
+
+# AI Ascent Hackathon — Solution Design
+
+## Step 1: Build an AI Case Library
+- Create a structured dataset (one row per case) capturing all key fields:
+  - Case ID(auto gen),Owner Login, Job Level, Program/Team, Use Case Title, Problem Statement, AI Technique Used, Tools/Services, Key Prompts, Input Data, Output/Outcome, Performance Metrics (e.g. time saved, accuracy, cost reduction), Status, Date (auto gen), rank (auto gen)
+- Source cases from existing AI initiatives, POCs, and production deployments
+- Normalize field values for consistent filtering and analysis
+
+## Step 2: Build a Learner Input Portal for AI Initiatives
+- Provide a form/interface for learners to submit their own AI initiatives with the same key fields as the Case Library
+- Include validation rules to ensure data quality (required fields, dropdown selections for categorical fields)
+- Support draft/save/submit workflow so entries can be refined before final submission
+
+## Step 3: Build a Filterable UI to Browse Initiatives
+- Display all submitted initiatives in a searchable, sortable table/grid view
+- Support filtering by every field (Program, AI Technique, Status, Performance Metrics, etc.)
+- Allow export to CSV for offline analysis
+
+## Step 4: Build an Analytics Dashboard
+- Visualize initiative data with charts and summaries:
+  - By Program/Team: count of initiatives, distribution of AI techniques
+  - By Performance: time saved, accuracy improvements, cost reductions
+  - By Status: pipeline view (ideation → POC → production)
+  - Trend analysis: submissions over time
+- Use interactive charts with drill-down capability
+
+## Step 5: Build a Ranking Mechanism
+- Score and rank initiatives based on weighted performance criteria:
+  - Impact (e.g. time saved, cost reduction, accuracy gain)
+  - Scalability (reusability across teams/programs)
+  - Complexity vs. effort
+  - Innovation factor
+- Display leaderboard view with configurable weights
+- Allow comparison of top-ranked initiatives side by side
+
+## Step 6: Build an AI Solution Design Agent
+- Accept a user-described scenario/problem as input
+- Search the AI Case Library for similar cases using semantic matching
+- Generate a recommended AI automation solution design including:
+  - Suggested AI technique(s) and tools/services
+  - Reference cases from the library
+  - Estimated effort and expected outcomes
+  - Implementation steps
+- Allow iterative refinement through follow-up questions

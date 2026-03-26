@@ -1,0 +1,52 @@
+Phase 6: AI Solution Design Agent
+
+## Overview
+A conversational agent that accepts a user's problem description and generates
+an AI solution design by matching against the Case Library. Since we don't have
+AWS credentials, we use keyword-based similarity matching instead of embeddings.
+
+## How It Works
+1. User describes their problem/scenario in a text box
+2. Backend searches the Case Library for similar cases using keyword matching
+   (TF-IDF style scoring across title, problem statement, solution description,
+   AI technique, and tools/services fields)
+3. Agent generates a structured solution design based on matched cases:
+   - Recommended AI technique(s) — drawn from top matching cases
+   - Reference cases — links to similar initiatives in the library
+   - Suggested tools/services — based on what worked for similar cases
+   - Estimated effort — averaged from matched cases' dev_time_hours
+   - Expected outcomes — projected metrics based on similar cases
+   - Implementation steps — generated from matched case patterns
+4. User can refine by asking follow-up questions (session-based context)
+
+## API Endpoints
+- POST /agent/design
+  - Body: { "query": "describe your problem...", "session_id": null }
+  - Returns: { "session_id": "...", "design": { ... }, "matched_cases": [...] }
+- POST /agent/followup
+  - Body: { "session_id": "...", "question": "what about scaling?" }
+  - Returns: { "answer": "...", "updated_design": { ... } }
+
+## Frontend: "AI Agent" Tab
+- Chat-style interface with input box at bottom
+- First message triggers solution design generation
+- Design displayed as structured card (technique, tools, effort, steps)
+- Matched cases shown as clickable references
+- Follow-up messages refine the design
+- "New Conversation" button to reset
+
+## Similarity Matching (No AWS Required)
+- Tokenize query and case text fields into keywords
+- Score each case by keyword overlap (weighted by field importance):
+  - problem_statement: weight 3x
+  - use_case_title: weight 2x
+  - solution_description: weight 2x
+  - ai_technique: weight 2x
+  - tools_services: weight 1x
+- Return top 3-5 matching cases
+- Generate design recommendations from matched case data
+
+## Future Enhancement (When Bedrock Available)
+- Replace keyword matching with embedding-based semantic search
+- Replace rule-based design generation with LLM (Claude) generation
+- Add conversational memory via Bedrock's conversation API

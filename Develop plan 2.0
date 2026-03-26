@@ -1,0 +1,195 @@
+# AI Case Library — Development Plan 2.0
+
+Tech Stack: Python (FastAPI) + React (Ant Design via CDN) + SQLite
+Status: All 6 phases implemented and working
+
+---
+
+## Phase 1: Project Foundation & Data Layer
+
+- FastAPI backend with CORS, error handling
+- SQLAlchemy models for Case Library schema:
+  - Case ID (UUID, auto), Owner Login, Job Level, Program/Team
+  - Use Case Title, Problem Statement, Solution Description
+  - AI Technique, Tools/Services, Key Prompts, Input Data, Output/Outcome
+  - Time Saved %, Yearly HC Saved, Accuracy %, Cost Reduction %, Yearly USD Saved
+  - Dev Time Hours, Status, Scalability Score, Innovation Score
+  - Date Created (auto), Date Updated (auto), Rank
+- CRUD API: POST/GET/PUT/DELETE /cases
+- SQLite database with seed data (5 sample cases)
+- GET /cases/options — dropdown values served from constants.py
+
+---
+
+## Phase 2: Learner Input Portal & User Auth
+
+### Submission Form
+- React + Ant Design form with all case fields
+- Dropdowns for: Job Level (L3-L8), Program/Team (15 teams), AI Technique (8 types), Status (Developing/UAT/In Production)
+- Sliders for Scalability Score and Innovation Score (1-10)
+- Validation rules on required fields
+
+### User Authentication
+- User model: login, email, display_name, hashed_password, role (learner/admin)
+- JWT token auth with 8-hour expiry
+- Register, Login, Forgot Password, Reset Password flows
+- Password reset via token (printed to server console for hackathon)
+- Role-based access: learners edit own cases, admins edit all
+- Owner auto-populated from logged-in user
+
+### Dropdown Constants
+- JOB_LEVELS: L3, L4, L5, L6, L7, L8
+- PROGRAMS_TEAMS: Chemical Safety, Climate Pledge Friendly, Dangerous Goods, Environmental Assurance and Protection, EU Deforestation Regulation, Food Safety Operations, Global Trade Services, North American Customer Fulfillment, ONT, Private Brands, Quality Operations, Support Function, Sustainability, Transport Risk Compliance, Others
+- AI_TECHNIQUES: NLP Text Classification, Time Series Forecasting, Generative AI (LLM), Computer Vision, Reinforcement Learning, Anomaly Detection, Recommendation Systems, Others
+- STATUSES: Developing, UAT, In Production
+
+---
+
+## Phase 3: Filterable Browse UI
+
+- Ant Design Table with column filtering, sorting on every column
+- Global text search across all fields (title, owner, program, technique, problem, solution, tools, status)
+- Column dropdown filters for Program, AI Technique, Status
+- Pagination with configurable page sizes (10/25/50/100)
+- CSV export: GET /cases/export — downloads all cases as CSV
+- "My Initiatives" tab filters to current user's cases
+- Edit/Delete buttons respect ownership (learners own, admins all)
+
+---
+
+## Phase 4: Analytics Dashboard
+
+### Summary Cards (top row)
+- Total Initiatives, Yearly HC Saved, Yearly USD Saved, Avg Accuracy, Total Dev Hours
+
+### Charts (pure CSS/React, no Chart.js dependency)
+1. Initiatives by Program/Team — horizontal bar chart
+2. AI Technique Distribution — CSS conic-gradient donut chart
+3. Status Pipeline — color-coded bars (blue/orange/green)
+4. Performance Metrics by Program — grouped bars (time saved, cost reduction, accuracy)
+5. Yearly USD Saved by Program — horizontal bars sorted descending
+6. Submissions Over Time — vertical bar chart by month
+
+### Backend Endpoints
+- GET /analytics/summary — totals and averages
+- GET /analytics/by-program — counts and metrics grouped by program
+- GET /analytics/by-technique — counts grouped by AI technique
+- GET /analytics/by-status — counts grouped by status
+- GET /analytics/trends — submissions over time (monthly)
+
+---
+
+## Phase 5: Ranking Engine + AI Analysis
+
+### Part A: Weighted Scoring & Leaderboard (Admin Only)
+- Composite score = weighted sum of normalized metrics (0-100):
+  - Impact (40%): time_saved + cost_reduction + accuracy + yearly_usd_saved
+  - Scalability (25%): scalability_score * 10
+  - Effort Efficiency (20%): yearly_usd_saved / dev_time_hours (ROI)
+  - Innovation (15%): innovation_score * 10
+- 4 weight sliders with total % indicator (must equal 100%)
+- Refresh button to recalculate after adjusting weights
+- Top 3 highlighted with medal icons
+- GET /rankings?impact_w=40&scalability_w=25&effort_w=20&innovation_w=15
+
+### Part B: Rule-Based AI Analysis (No AWS Required)
+- "AI Analysis" button on each leaderboard row
+- Compares case metrics against library averages
+- Generates: Strengths, Weaknesses, Suggestions, Risks
+- Modal popup with structured analysis sections
+- POST /rankings/{case_id}/ai-analysis
+- Future: swap rule-based engine with Amazon Bedrock Claude
+
+---
+
+## Phase 6: AI Solution Design Agent
+
+### Keyword-Based Similarity Matching
+- Tokenize query into keywords, score against all cases
+- Field weights: problem_statement (3x), title/solution/technique (2x), tools (1x)
+- Returns top matching cases
+
+### Solution Design Generation
+- Recommended AI technique from top matches
+- Suggested tools/services aggregated from matches
+- Estimated effort averaged from matched cases
+- Technique-specific implementation steps (10 steps)
+- Reference cases with similarity scores
+
+### Chat Interface
+- Chat-style UI with user/agent message bubbles
+- First message generates full solution design card
+- Follow-up messages provide contextual answers (cost, scaling, timeline, risk, team)
+- Session-based conversation tracking
+- "New Conversation" button to reset
+- POST /agent/design, POST /agent/followup
+
+### Future Enhancement
+- Replace keyword matching with embedding-based semantic search (Bedrock)
+- Replace rule-based generation with LLM (Claude) generation
+- Add conversational memory via Bedrock conversation API
+
+---
+
+## Project Structure
+
+```
+AI Hackathon/
+├── backend/
+│   ├── app/
+│   │   ├── __init__.py
+│   │   ├── database.py      — SQLite + SQLAlchemy setup
+│   │   ├── models.py        — User + Case models
+│   │   ├── schemas.py       — Pydantic schemas (Create/Update/Response)
+│   │   ├── crud.py          — CRUD operations with filtering/sorting/search
+│   │   ├── constants.py     — Dropdown options
+│   │   ├── auth.py          — JWT auth, password hashing, reset
+│   │   ├── analytics.py     — Aggregation queries
+│   │   ├── ranking.py       — Scoring engine + AI analysis
+│   │   ├── agent.py         — Solution design agent
+│   │   └── main.py          — FastAPI app with all endpoints
+│   ├── requirements.txt
+│   └── seed_data.py         — Sample data + admin user
+├── frontend/
+│   └── index.html           — Single-file React + Ant Design app
+```
+
+## Running the App
+
+```
+cd "AI Hackathon/backend"
+py seed_data.py              # First time only
+py -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+Open http://127.0.0.1:8000/ — Login as admin/admin123 or register a new account.
+
+---
+
+## Deployment Options
+
+### Option A: Local Only (Development / Demo)
+```
+cd "AI Hackathon/backend"
+py -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+Open http://127.0.0.1:8000/ in your browser. Only accessible from your machine.
+
+### Option B: Share on Amazon Corp Network
+```
+cd "AI Hackathon/backend"
+py -m uvicorn app.main:app --host 0.0.0.0 --port 8080
+```
+Note: Use port 8080 (not 8000) to avoid conflict with AWS WorkDocs Drive Client.
+Others on the same network can access via: http://REM-5CG4303D6R:8080/
+May need to allow port through Windows Firewall:
+```
+netsh advfirewall firewall add rule name="AI Case Library" dir=in action=allow protocol=TCP localport=8080
+```
+
+### Future: Production Deployment (EC2 / ECS)
+- Replace SQLite with PostgreSQL or DynamoDB
+- Add HTTPS via ALB with ACM certificate
+- Integrate Midway (Amazon SSO) instead of custom JWT auth
+- Change SECRET_KEY in auth.py to a real random value
+- Consider ECS Fargate for containerized deployment

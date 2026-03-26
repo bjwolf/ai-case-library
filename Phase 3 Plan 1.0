@@ -1,0 +1,7 @@
+Phase 3: Filterable Browse UI
+Data table component (using something like TanStack Table or AG Grid)
+Multi-column filtering: text search, dropdown filters, date range
+Sorting on every column
+Pagination
+CSV export endpoint: GET /cases/export?format=csv
+API query params: GET /cases?program=X&technique=Y&status=Z&sort=date&order=desc

@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Case Library - Initiative Portal</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/antd/5.21.2/reset.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.25.6/babel.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dayjs/1.11.13/dayjs.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/antd/5.21.2/antd.min.js"></script>
+  <style>
+    body { margin: 0; background: #f5f5f5; }
+    .site-layout { max-width: 1200px; margin: 0 auto; padding: 24px; }
+    .auth-container { max-width: 400px; margin: 80px auto; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { Layout, Form, Input, Select, Slider, Button, Table, Tag,
+  message, Card, Space, Typography, Tabs, Popconfirm, Tooltip, Row, Col, Badge, Dropdown } = antd;
+const { Header, Content, Footer } = Layout;
+const { Title, Text, Link } = Typography;
+const { TextArea } = Input;
+const { Option } = Select;
+
+const API = window.location.origin;
+
+// --- Auth helpers ---
+function getToken() { return localStorage.getItem("token"); }
+function getUser() { try { return JSON.parse(localStorage.getItem("user")); } catch { return null; } }
+function authHeaders() { const t = getToken(); return t ? { Authorization: `Bearer ${t}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" }; }
+
+async function apiLogin(login, password) {
+  const r = await fetch(`${API}/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ login, password }) });
+  if (!r.ok) throw new Error((await r.json()).detail); return r.json();
+}
+async function apiRegister(data) {
+  const r = await fetch(`${API}/auth/register`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data) });
+  if (!r.ok) throw new Error((await r.json()).detail); return r.json();
+}
+async function apiForgotPassword(email) {
+  const r = await fetch(`${API}/auth/forgot-password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
+  return r.json();
+}
+async function apiResetPassword(token, newPassword) {
+  const r = await fetch(`${API}/auth/reset-password`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, new_password: newPassword }) });
+  if (!r.ok) throw new Error((await r.json()).detail); return r.json();
+}
+async function fetchOptions() { return (await fetch(`${API}/cases/options`)).json(); }
+async function fetchCases(params = {}) { const qs = new URLSearchParams(params).toString(); return (await fetch(`${API}/cases?${qs}`, { headers: authHeaders() })).json(); }
+async function createCase(data) {
+  const r = await fetch(`${API}/cases`, { method: "POST", headers: authHeaders(), body: JSON.stringify(data) });
+  if (!r.ok) throw new Error((await r.json()).detail); return r.json();
+}
+async function updateCase(id, data) {
+  const r = await fetch(`${API}/cases/${id}`, { method: "PUT", headers: authHeaders(), body: JSON.stringify(data) });
+  if (!r.ok) throw new Error((await r.json()).detail); return r.json();
+}
+async function submitCaseApi(id) {
+  const r = await fetch(`${API}/cases/${id}/submit`, { method: "PUT", headers: authHeaders() });
+  if (!r.ok) throw new Error((await r.json()).detail); return r.json();
+}
+async function approveCaseApi(id) {
+  const r = await fetch(`${API}/cases/${id}/approve`, { method: "PUT", headers: authHeaders() });
+  if (!r.ok) throw new Error((await r.json()).detail); return r.json();
+}
+async function deleteCaseApi(id) {
+  const r = await fetch(`${API}/cases/${id}`, { method: "DELETE", headers: authHeaders() });
+  if (!r.ok) throw new Error((await r.json()).detail); return r.json();
+}
+
+// --- Login Page ---
+function LoginPage({ onLogin, onSwitch }) {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = React.useState(false);
+  const handleLogin = async (values) => {
+    setLoading(true);
+    try { const res = await apiLogin(values.login, values.password); onLogin(res); }
+    catch (e) { message.error(e.message); }
+    finally { setLoading(false); }
+  };
+  return (
+    <div className="auth-container">
+      <Card title="Login to AI Case Library">
+        <Form form={form} layout="vertical" onFinish={handleLogin}>
+          <Form.Item name="login" label="Login" rules={[{ required: true }]}>
+            <Input placeholder="Your login alias" />
+          </Form.Item>
+          <Form.Item name="password" label="Password" rules={[{ required: true }]}>
+            <Input.Password placeholder="Password" />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" loading={loading} block>Login</Button>
+          <div style={{ marginTop: 16, textAlign: "center" }}>
+            <Link onClick={() => onSwitch("register")}>Create account</Link>
+            <span style={{ margin: "0 8px" }}>|</span>
+            <Link onClick={() => onSwitch("forgot")}>Forgot password?</Link>
+          </div>
+        </Form>
+      </Card>
+    </div>
+  );
+}
+
+// --- Register Page ---
+function RegisterPage({ onLogin, onSwitch }) {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = React.useState(false);
+  const handleRegister = async (values) => {
+    setLoading(true);
+    try { const res = await apiRegister(values); onLogin(res); message.success("Account created"); }
+    catch (e) { message.error(e.message); }
+    finally { setLoading(false); }
+  };
+  return (
+    <div className="auth-container">
+      <Card title="Create Account">
+        <Form form={form} layout="vertical" onFinish={handleRegister}>
+          <Form.Item name="login" label="Login Alias" rules={[{ required: true }]}>
+            <Input placeholder="e.g. jsmith" />
+          </Form.Item>
+          <Form.Item name="email" label="Email" rules={[{ required: true, type: "email" }]}>
+            <Input placeholder="your@email.com" />
+          </Form.Item>
+          <Form.Item name="display_name" label="Display Name" rules={[{ required: true }]}>
+            <Input placeholder="John Smith" />
+          </Form.Item>
+          <Form.Item name="password" label="Password" rules={[{ required: true, min: 6 }]}>
+            <Input.Password placeholder="Min 6 characters" />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" loading={loading} block>Register</Button>
+          <div style={{ marginTop: 16, textAlign: "center" }}>
+            <Link onClick={() => onSwitch("login")}>Already have an account? Login</Link>
+          </div>
+        </Form>
+      </Card>
+    </div>
+  );
+}
+
+// --- Forgot Password Page ---
+function ForgotPasswordPage({ onSwitch }) {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = React.useState(false);
+  const [sent, setSent] = React.useState(false);
+  const handleSubmit = async (values) => {
+    setLoading(true);
+    try { await apiForgotPassword(values.email); setSent(true); message.success("Check your email (or server console) for the reset link"); }
+    catch (e) { message.error(e.message); }
+    finally { setLoading(false); }
+  };
+  return (
+    <div className="auth-container">
+      <Card title="Reset Password">
+        {sent ? (
+          <div>
+            <p>A reset link has been sent. Check the server console for the link.</p>
+            <Button onClick={() => onSwitch("reset")} block>I have a reset token</Button>
+            <div style={{ marginTop: 8, textAlign: "center" }}>
+              <Link onClick={() => onSwitch("login")}>Back to login</Link>
+            </div>
+          </div>
+        ) : (
+          <Form form={form} layout="vertical" onFinish={handleSubmit}>
+            <Form.Item name="email" label="Email" rules={[{ required: true, type: "email" }]}>
+              <Input placeholder="your@email.com" />
+            </Form.Item>
+            <Button type="primary" htmlType="submit" loading={loading} block>Send Reset Link</Button>
+            <div style={{ marginTop: 16, textAlign: "center" }}>
+              <Link onClick={() => onSwitch("login")}>Back to login</Link>
+            </div>
+          </Form>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// --- Reset Password Page ---
+function ResetPasswordPage({ onSwitch }) {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = React.useState(false);
+  const handleReset = async (values) => {
+    setLoading(true);
+    try { await apiResetPassword(values.token, values.new_password); message.success("Password reset. Please login."); onSwitch("login"); }
+    catch (e) { message.error(e.message); }
+    finally { setLoading(false); }
+  };
+  return (
+    <div className="auth-container">
+      <Card title="Set New Password">
+        <Form form={form} layout="vertical" onFinish={handleReset}>
+          <Form.Item name="token" label="Reset Token" rules={[{ required: true }]}>
+            <Input placeholder="Paste token from email/console" />
+          </Form.Item>
+          <Form.Item name="new_password" label="New Password" rules={[{ required: true, min: 6 }]}>
+            <Input.Password placeholder="Min 6 characters" />
+          </Form.Item>
+          <Button type="primary" htmlType="submit" loading={loading} block>Reset Password</Button>
+          <div style={{ marginTop: 16, textAlign: "center" }}>
+            <Link onClick={() => onSwitch("login")}>Back to login</Link>
+          </div>
+        </Form>
+      </Card>
+    </div>
+  );
+}
+
+// --- Case Form ---
+function CaseForm({ options, onSuccess, editingCase, onCancelEdit, currentUser }) {
+  const [form] = Form.useForm();
+  const [loading, setLoading] = React.useState(false);
+  const isEditing = !!editingCase;
+  React.useEffect(() => { if (editingCase) form.setFieldsValue(editingCase); else form.resetFields(); }, [editingCase]);
+
+  const handleSaveDraft = async () => {
+    try {
+      await form.validateFields(["program_team","use_case_title","problem_statement","ai_technique"]);
+      const v = form.getFieldsValue(true); setLoading(true);
+      if (isEditing) { await updateCase(editingCase.id, { ...v, status: "draft" }); message.success("Draft updated"); }
+      else { await createCase({ ...v, status: "draft" }); message.success("Draft saved"); }
+      form.resetFields(); onSuccess();
+    } catch (e) { if (e.errorFields) message.error("Fill required fields"); else message.error(e.message); }
+    finally { setLoading(false); }
+  };
+  const handleSubmit = async () => {
+    try {
+      await form.validateFields(); const v = form.getFieldsValue(true); setLoading(true);
+      if (isEditing) { await updateCase(editingCase.id, { ...v, status: "submitted" }); }
+      else { await createCase({ ...v, status: "submitted" }); }
+      message.success("Submitted"); form.resetFields(); onSuccess();
+    } catch (e) { if (e.errorFields) message.error("Fill all required fields"); else message.error(e.message); }
+    finally { setLoading(false); }
+  };
+
+  return (
+    <Card title={isEditing ? "Edit Initiative" : "Submit New AI Initiative"} className="form-card"
+      extra={isEditing && <Button onClick={() => { form.resetFields(); onCancelEdit(); }}>Cancel</Button>}>
+      <Form form={form} layout="vertical" initialValues={{ scalability_score: 5, innovation_score: 5 }}>
+        <Row gutter={16}>
+          <Col span={8}>
+            <Form.Item label="Owner"><Input value={currentUser?.login} disabled /></Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item name="job_level" label="Job Level">
+              <Select placeholder="Select" allowClear>
+                {(options.job_levels||[]).map(l=><Option key={l} value={l}>{l}</Option>)}
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item name="program_team" label="Program / Team" rules={[{required:true}]}>
+              <Select placeholder="Select" showSearch>
+                {(options.programs_teams||[]).map(p=><Option key={p} value={p}>{p}</Option>)}
+              </Select>
+            </Form.Item>
+          </Col>
+        </Row>
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item name="use_case_title" label="Use Case Title" rules={[{required:true}]}>
+              <Input placeholder="Short descriptive title" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item name="ai_technique" label="AI Technique" rules={[{required:true}]}>
+              <Select placeholder="Select" showSearch>
+                {(options.ai_techniques||[]).map(t=><Option key={t} value={t}>{t}</Option>)}
+              </Select>
+            </Form.Item>
+          </Col>
+        </Row>
+        <Form.Item name="problem_statement" label="Problem Statement" rules={[{required:true}]}>
+          <TextArea rows={3} placeholder="Describe the problem" />
+        </Form.Item>
+        <Form.Item name="solution_description" label="Solution Description"><TextArea rows={3} placeholder="Describe the AI solution design and approach" /></Form.Item>
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item name="status" label="Status">
+              <Select placeholder="Select status">
+                {(options.statuses||[]).map(s=><Option key={s} value={s}>{s}</Option>)}
+              </Select>
+            </Form.Item>
+          </Col>
+          <Col span={12} />
+        </Row>
+        <Row gutter={16}>
+          <Col span={12}><Form.Item name="tools_services" label="Tools / Services"><Input placeholder="e.g. SageMaker, Bedrock" /></Form.Item></Col>
+          <Col span={12}><Form.Item name="input_data" label="Input Data"><Input placeholder="e.g. 3 years of sales data" /></Form.Item></Col>
+        </Row>
+        <Form.Item name="key_prompts" label="Key Prompts"><TextArea rows={2} /></Form.Item>
+        <Form.Item name="output_outcome" label="Output / Outcome"><TextArea rows={2} /></Form.Item>
+        <Row gutter={16}>
+          <Col span={6}><Form.Item name="time_saved" label="Time Saved (%)"><Input type="number" min={0} max={100} /></Form.Item></Col>
+          <Col span={6}><Form.Item name="yearly_hc_saved" label="Yearly HC Saved"><Input type="number" min={0} /></Form.Item></Col>
+          <Col span={6}><Form.Item name="accuracy" label="Accuracy (%)"><Input type="number" min={0} max={100} /></Form.Item></Col>
+          <Col span={6}><Form.Item name="dev_time_hours" label="Dev Time (hours)"><Input type="number" min={0} /></Form.Item></Col>
+        </Row>
+        <Row gutter={16}>
+          <Col span={6}><Form.Item name="cost_reduction" label="Cost Reduction (%)"><Input type="number" min={0} max={100} /></Form.Item></Col>
+          <Col span={6}><Form.Item name="yearly_usd_saved" label="Yearly USD Saved ($)"><Input type="number" min={0} /></Form.Item></Col>
+          <Col span={12} />
+        </Row>
+        <Row gutter={16}>
+          <Col span={12}><Form.Item name="scalability_score" label="Scalability (1-10)"><Slider min={1} max={10} marks={{1:"1",5:"5",10:"10"}} /></Form.Item></Col>
+          <Col span={12}><Form.Item name="innovation_score" label="Innovation (1-10)"><Slider min={1} max={10} marks={{1:"1",5:"5",10:"10"}} /></Form.Item></Col>
+        </Row>
+        <Space>
+          <Button onClick={handleSaveDraft} loading={loading}>Save Draft</Button>
+          <Button type="primary" onClick={handleSubmit} loading={loading}>Submit</Button>
+        </Space>
+      </Form>
+    </Card>
+  );
+}
+
+// --- Case List ---
+function CaseList({ cases, loading, options, onEdit, onRefresh, currentUser }) {
+  const isAdmin = currentUser?.role === "admin";
+  const canModify = (record) => isAdmin || record.owner_login === currentUser?.login;
+  const statusColors = { "Developing": "processing", "UAT": "warning", "In Production": "success" };
+  const [searchText, setSearchText] = React.useState("");
+
+  const filteredCases = React.useMemo(() => {
+    if (!searchText) return cases;
+    const term = searchText.toLowerCase();
+    return cases.filter(c =>
+      (c.use_case_title||"").toLowerCase().includes(term) ||
+      (c.owner_login||"").toLowerCase().includes(term) ||
+      (c.program_team||"").toLowerCase().includes(term) ||
+      (c.ai_technique||"").toLowerCase().includes(term) ||
+      (c.problem_statement||"").toLowerCase().includes(term) ||
+      (c.solution_description||"").toLowerCase().includes(term) ||
+      (c.tools_services||"").toLowerCase().includes(term) ||
+      (c.status||"").toLowerCase().includes(term)
+    );
+  }, [cases, searchText]);
+
+  const handleExportCSV = () => {
+    window.open(`${API}/cases/export`, "_blank");
+  };
+
+  const columns = [
+    { title: "Title", dataIndex: "use_case_title", key: "t", width: 180, sorter: (a,b) => (a.use_case_title||"").localeCompare(b.use_case_title||""),
+      render: (t, r) => <Tooltip title={r.problem_statement}><a onClick={() => canModify(r) && onEdit(r)}>{t}</a></Tooltip> },
+    { title: "Owner", dataIndex: "owner_login", key: "o", width: 80, sorter: (a,b) => (a.owner_login||"").localeCompare(b.owner_login||"") },
+    { title: "Program", dataIndex: "program_team", key: "p", width: 140,
+      filters: (options.programs_teams||[]).map(p=>({text:p,value:p})), onFilter: (v,r) => r.program_team===v,
+      sorter: (a,b) => (a.program_team||"").localeCompare(b.program_team||"") },
+    { title: "AI Technique", dataIndex: "ai_technique", key: "ai", width: 140,
+      filters: (options.ai_techniques||[]).map(t=>({text:t,value:t})), onFilter: (v,r) => r.ai_technique===v,
+      sorter: (a,b) => (a.ai_technique||"").localeCompare(b.ai_technique||"") },
+    { title: "Status", dataIndex: "status", key: "s", width: 110,
+      filters: (options.statuses||[]).map(s=>({text:s,value:s})), onFilter: (v,r) => r.status===v,
+      sorter: (a,b) => (a.status||"").localeCompare(b.status||""),
+      render: s => <Tag color={statusColors[s]}>{s}</Tag> },
+    { title: "Time%", dataIndex: "time_saved", key: "ts", width: 70, sorter: (a,b)=>(a.time_saved||0)-(b.time_saved||0), render: v=>v!=null?`${v}%`:"-" },
+    { title: "HC/yr", dataIndex: "yearly_hc_saved", key: "hc", width: 70, sorter: (a,b)=>(a.yearly_hc_saved||0)-(b.yearly_hc_saved||0), render: v=>v!=null?v.toFixed(1):"-" },
+    { title: "USD/yr", dataIndex: "yearly_usd_saved", key: "usd", width: 90, sorter: (a,b)=>(a.yearly_usd_saved||0)-(b.yearly_usd_saved||0), render: v=>v!=null?`$${v.toLocaleString()}`:"-" },
+    { title: "Dev Hrs", dataIndex: "dev_time_hours", key: "dh", width: 75, sorter: (a,b)=>(a.dev_time_hours||0)-(b.dev_time_hours||0), render: v=>v!=null?`${v}h`:"-" },
+    { title: "Created", dataIndex: "date_created", key: "dc", width: 100, sorter: (a,b) => (a.date_created||"").localeCompare(b.date_created||""),
+      render: v => v ? new Date(v).toLocaleDateString() : "-" },
+    { title: "Actions", key: "a", width: 120, render: (_, r) => (
+      <Space>
+        {canModify(r) && <Button size="small" onClick={() => onEdit(r)}>Edit</Button>}
+        {canModify(r) && (
+          <Popconfirm title="Delete?" onConfirm={async()=>{await deleteCaseApi(r.id);message.success("Deleted");onRefresh();}}>
+            <Button size="small" danger>Del</Button>
+          </Popconfirm>
+        )}
+      </Space>
+    )},
+  ];
+  return (
+    <Card title={<span>All Initiatives <Badge count={filteredCases.length} style={{backgroundColor:"#1677ff",marginLeft:8}} /></span>}
+      extra={<Space>
+        <Input.Search placeholder="Search all fields..." allowClear style={{width:280}} onSearch={setSearchText} onChange={e => { if(!e.target.value) setSearchText(""); }} />
+        <Button onClick={handleExportCSV}>Export CSV</Button>
+      </Space>}>
+      <Table columns={columns} dataSource={filteredCases} rowKey="id" loading={loading} size="small"
+        scroll={{x:1400}} pagination={{pageSize:10,showSizeChanger:true,pageSizeOptions:["10","25","50","100"],showTotal:(t,range)=>`${range[0]}-${range[1]} of ${t} cases`}} />
+    </Card>
+  );
+}
+
+// --- Simple Bar ---
+function SimpleBar({ label, value, max, color, suffix }) {
+  const pct = max > 0 ? (value / max) * 100 : 0;
+  return (
+    <div style={{display:"flex",alignItems:"center",marginBottom:6}}>
+      <div style={{width:140,fontSize:12,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={label}>{label}</div>
+      <div style={{flex:1,background:"#f0f0f0",borderRadius:4,height:20,marginRight:8}}>
+        <div style={{width:`${pct}%`,background:color||"#1677ff",borderRadius:4,height:20,minWidth:pct>0?2:0,transition:"width 0.3s"}} />
+      </div>
+      <div style={{width:70,textAlign:"right",fontSize:12}}>{suffix ? `${value}${suffix}` : value}</div>
+    </div>
+  );
+}
+
+// --- Donut via CSS ---
+function SimpleDonut({ items, colors }) {
+  const total = items.reduce((s,i)=>s+i.value,0);
+  let cumPct = 0;
+  const gradParts = items.map((item,idx) => {
+    const pct = total>0 ? (item.value/total)*100 : 0;
+    const start = cumPct; cumPct += pct;
+    return `${colors[idx%colors.length]} ${start}% ${cumPct}%`;
+  });
+  return (
+    <div style={{display:"flex",alignItems:"center",gap:24}}>
+      <div style={{width:160,height:160,borderRadius:"50%",background:`conic-gradient(${gradParts.join(",")})`,position:"relative",flexShrink:0}}>
+        <div style={{position:"absolute",top:"25%",left:"25%",width:"50%",height:"50%",borderRadius:"50%",background:"#fff"}} />
+      </div>
+      <div>
+        {items.map((item,idx) => (
+          <div key={idx} style={{display:"flex",alignItems:"center",marginBottom:4,fontSize:12}}>
+            <div style={{width:12,height:12,borderRadius:2,background:colors[idx%colors.length],marginRight:6}} />
+            {item.label}: {item.value} ({total>0?Math.round(item.value/total*100):0}%)
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// --- Dashboard ---
+function Dashboard() {
+  const [data, setData] = React.useState(null);
+  const [loading, setLoading] = React.useState(true);
+
+  React.useEffect(() => {
+    (async () => {
+      setLoading(true);
+      try {
+        const [s, p, t, st, tr] = await Promise.all([
+          fetch(`${API}/analytics/summary`).then(r=>r.json()),
+          fetch(`${API}/analytics/by-program`).then(r=>r.json()),
+          fetch(`${API}/analytics/by-technique`).then(r=>r.json()),
+          fetch(`${API}/analytics/by-status`).then(r=>r.json()),
+          fetch(`${API}/analytics/trends`).then(r=>r.json()),
+        ]);
+        setData({ summary: s, byProgram: p, byTechnique: t, byStatus: st, trends: tr });
+      } catch(e) { message.error("Failed to load analytics"); }
+      finally { setLoading(false); }
+    })();
+  }, []);
+
+  if (loading || !data) return <Card loading={true} />;
+
+  const { summary, byProgram, byTechnique, byStatus, trends } = data;
+  const COLORS = ["#1677ff","#52c41a","#faad14","#ff4d4f","#722ed1","#13c2c2","#eb2f96","#fa8c16","#2f54eb","#a0d911"];
+  const scm = { "Developing":"#1677ff", "UAT":"#faad14", "In Production":"#52c41a" };
+  const maxCount = Math.max(...byProgram.map(r=>r.count), 1);
+  const maxUsd = Math.max(...byProgram.map(r=>r.total_usd_saved), 1);
+  const maxPerf = Math.max(...byProgram.flatMap(r=>[r.avg_time_saved,r.avg_cost_reduction,r.avg_accuracy]), 1);
+  const maxTrend = Math.max(...trends.map(r=>r.count), 1);
+
+  return (
+    <div>
+      <Row gutter={[16,16]} style={{marginBottom:24}}>
+        <Col span={4}><Card size="small"><div style={{textAlign:"center"}}><div style={{fontSize:28,fontWeight:"bold",color:"#1677ff"}}>{summary.total_initiatives}</div><div>Total Initiatives</div></div></Card></Col>
+        <Col span={5}><Card size="small"><div style={{textAlign:"center"}}><div style={{fontSize:28,fontWeight:"bold",color:"#52c41a"}}>{summary.total_hc_saved}</div><div>Yearly HC Saved</div></div></Card></Col>
+        <Col span={5}><Card size="small"><div style={{textAlign:"center"}}><div style={{fontSize:28,fontWeight:"bold",color:"#faad14"}}>${summary.total_usd_saved.toLocaleString()}</div><div>Yearly USD Saved</div></div></Card></Col>
+        <Col span={5}><Card size="small"><div style={{textAlign:"center"}}><div style={{fontSize:28,fontWeight:"bold",color:"#722ed1"}}>{summary.avg_accuracy}%</div><div>Avg Accuracy</div></div></Card></Col>
+        <Col span={5}><Card size="small"><div style={{textAlign:"center"}}><div style={{fontSize:28,fontWeight:"bold",color:"#eb2f96"}}>{summary.total_dev_hours}h</div><div>Total Dev Hours</div></div></Card></Col>
+      </Row>
+      <Row gutter={[16,16]}>
+        <Col span={12}>
+          <Card size="small" title="Initiatives by Program/Team">
+            {byProgram.map((r,i) => <SimpleBar key={i} label={r.program} value={r.count} max={maxCount} color={COLORS[i%10]} />)}
+          </Card>
+        </Col>
+        <Col span={12}>
+          <Card size="small" title="AI Technique Distribution">
+            <SimpleDonut items={byTechnique.map(r=>({label:r.technique,value:r.count}))} colors={COLORS} />
+          </Card>
+        </Col>
+      </Row>
+      <Row gutter={[16,16]} style={{marginTop:16}}>
+        <Col span={12}>
+          <Card size="small" title="Status Pipeline">
+            {byStatus.map((r,i) => <SimpleBar key={i} label={r.status} value={r.count} max={Math.max(...byStatus.map(x=>x.count),1)} color={scm[r.status]||"#999"} />)}
+          </Card>
+        </Col>
+        <Col span={12}>
+          <Card size="small" title="Performance Metrics by Program">
+            {byProgram.map((r,i) => (
+              <div key={i} style={{marginBottom:12}}>
+                <div style={{fontSize:12,fontWeight:"bold",marginBottom:2}}>{r.program}</div>
+                <SimpleBar label="Time Saved" value={r.avg_time_saved} max={maxPerf} color="#1677ff" suffix="%" />
+                <SimpleBar label="Cost Red." value={r.avg_cost_reduction} max={maxPerf} color="#52c41a" suffix="%" />
+                <SimpleBar label="Accuracy" value={r.avg_accuracy} max={maxPerf} color="#faad14" suffix="%" />
+              </div>
+            ))}
+          </Card>
+        </Col>
+      </Row>
+      <Row gutter={[16,16]} style={{marginTop:16}}>
+        <Col span={12}>
+          <Card size="small" title="Yearly USD Saved by Program">
+            {[...byProgram].sort((a,b)=>b.total_usd_saved-a.total_usd_saved).map((r,i) =>
+              <SimpleBar key={i} label={r.program} value={r.total_usd_saved} max={maxUsd} color="#52c41a" suffix="" />
+            )}
+            <div style={{fontSize:11,color:"#999",marginTop:4}}>Values in USD</div>
+          </Card>
+        </Col>
+        <Col span={12}>
+          <Card size="small" title="Submissions Over Time">
+            <div style={{display:"flex",alignItems:"flex-end",height:150,gap:4,paddingTop:8}}>
+              {trends.map((r,i) => (
+                <div key={i} style={{flex:1,textAlign:"center"}}>
+                  <div style={{background:"#1677ff",borderRadius:"4px 4px 0 0",height:`${maxTrend>0?(r.count/maxTrend)*120:0}px`,minHeight:r.count>0?4:0,transition:"height 0.3s"}} />
+                  <div style={{fontSize:10,marginTop:4}}>{r.month}</div>
+                  <div style={{fontSize:10,color:"#999"}}>{r.count}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        </Col>
+      </Row>
+    </div>
+  );
+}
+
+// --- Leaderboard ---
+function Leaderboard() {
+  const [rankings, setRankings] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [weights, setWeights] = React.useState({ impact: 40, scalability: 25, effort: 20, innovation: 15 });
+  const [analysisModal, setAnalysisModal] = React.useState(null);
+  const [analysisLoading, setAnalysisLoading] = React.useState(false);
+  const { Modal: AntModal } = antd;
+
+  const loadRankings = async (w) => {
+    setLoading(true);
+    try {
+      const qs = `impact_w=${w.impact}&scalability_w=${w.scalability}&effort_w=${w.effort}&innovation_w=${w.innovation}`;
+      const data = await fetch(`${API}/rankings?${qs}`).then(r=>r.json());
+      setRankings(data);
+    } catch(e) { message.error("Failed to load rankings"); }
+    finally { setLoading(false); }
+  };
+
+  React.useEffect(() => { loadRankings(weights); }, []);
+
+  const handleWeightChange = (key, val) => {
+    setWeights(prev => ({ ...prev, [key]: val }));
+  };
+
+  const handleAiAnalysis = async (record) => {
+    setAnalysisLoading(true);
+    setAnalysisModal({ title: record.use_case_title, data: null });
+    try {
+      const data = await fetch(`${API}/rankings/${record.id}/ai-analysis`, {
+        method: "POST", headers: authHeaders(),
+      }).then(r=>r.json());
+      setAnalysisModal({ title: record.use_case_title, data });
+    } catch(e) { message.error("Analysis failed"); setAnalysisModal(null); }
+    finally { setAnalysisLoading(false); }
+  };
+
+  const medalColors = { 1: "#FFD700", 2: "#C0C0C0", 3: "#CD7F32" };
+
+  const columns = [
+    { title: "#", dataIndex: "rank", key: "r", width: 50, render: (v) =>
+      <span style={{fontWeight:"bold",fontSize:16,color:medalColors[v]||"#333"}}>{medalColors[v] ? "🏆" : ""} {v}</span> },
+    { title: "Title", dataIndex: "use_case_title", key: "t", width: 180 },
+    { title: "Owner", dataIndex: "owner_login", key: "o", width: 80 },
+    { title: "Program", dataIndex: "program_team", key: "p", width: 130 },
+    { title: "Score", dataIndex: "composite_score", key: "cs", width: 70, render: v =>
+      <span style={{fontWeight:"bold",color: v>=70?"#52c41a":v>=40?"#faad14":"#ff4d4f"}}>{v}</span> },
+    { title: "Impact", dataIndex: "impact_score", key: "is", width: 65, render: v => <span>{v}</span> },
+    { title: "Scale", dataIndex: "scalability_score_calc", key: "sc", width: 60, render: v => <span>{v}</span> },
+    { title: "Effort", dataIndex: "effort_score", key: "ef", width: 60, render: v => <span>{v}</span> },
+    { title: "Innov", dataIndex: "innovation_score_calc", key: "in", width: 60, render: v => <span>{v}</span> },
+    { title: "USD/yr", dataIndex: "yearly_usd_saved", key: "u", width: 90, render: v => v!=null?`$${v.toLocaleString()}`:"-" },
+    { title: "", key: "ai", width: 100, render: (_, r) =>
+      <Button size="small" type="primary" ghost onClick={() => handleAiAnalysis(r)}>AI Analysis</Button> },
+  ];
+
+  const AnalysisSection = ({ title, items, color }) => (
+    <div style={{marginBottom:16}}>
+      <div style={{fontWeight:"bold",color,marginBottom:4}}>{title}</div>
+      {items && items.map((item,i) => <div key={i} style={{paddingLeft:12,marginBottom:2}}>• {item}</div>)}
+    </div>
+  );
+
+  return (
+    <div>
+      <Card size="small" title="Adjust Weights" style={{marginBottom:16}}>
+        <Row gutter={24}>
+          <Col span={5}><div>Impact ({weights.impact}%)</div><Slider min={0} max={100} value={weights.impact} onChange={v=>handleWeightChange("impact",v)} /></Col>
+          <Col span={5}><div>Scalability ({weights.scalability}%)</div><Slider min={0} max={100} value={weights.scalability} onChange={v=>handleWeightChange("scalability",v)} /></Col>
+          <Col span={5}><div>Effort Efficiency ({weights.effort}%)</div><Slider min={0} max={100} value={weights.effort} onChange={v=>handleWeightChange("effort",v)} /></Col>
+          <Col span={5}><div>Innovation ({weights.innovation}%)</div><Slider min={0} max={100} value={weights.innovation} onChange={v=>handleWeightChange("innovation",v)} /></Col>
+          <Col span={4} style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center"}}>
+            {(() => { const total = weights.impact + weights.scalability + weights.effort + weights.innovation;
+              const ok = total === 100;
+              return (<div>
+                <div style={{fontSize:20,fontWeight:"bold",color:ok?"#52c41a":"#ff4d4f"}}>{total}%</div>
+                <div style={{fontSize:12,color:ok?"#52c41a":"#ff4d4f"}}>{ok?"✓ Balanced":"Must equal 100%"}</div>
+                <Button size="small" type="primary" style={{marginTop:8}} onClick={() => loadRankings(weights)} disabled={total!==100}>Refresh</Button>
+              </div>);
+            })()}
+          </Col>
+        </Row>
+      </Card>
+      <Card title={<span>Leaderboard <Badge count={rankings.length} style={{backgroundColor:"#1677ff",marginLeft:8}} /></span>}>
+        <Table columns={columns} dataSource={rankings} rowKey="id" loading={loading} size="small"
+          scroll={{x:1100}} pagination={{pageSize:20}} />
+      </Card>
+      <AntModal title={analysisModal?.title ? `AI Analysis: ${analysisModal.title}` : "AI Analysis"}
+        open={!!analysisModal} onCancel={() => setAnalysisModal(null)} footer={null} width={600}>
+        {analysisLoading ? <Card loading={true} /> : analysisModal?.data && (
+          <div>
+            <div style={{background:"#f6ffed",padding:12,borderRadius:8,marginBottom:12}}><b>{analysisModal.data.summary}</b></div>
+            <AnalysisSection title="💪 Strengths" items={analysisModal.data.strengths} color="#52c41a" />
+            <AnalysisSection title="⚠️ Weaknesses" items={analysisModal.data.weaknesses} color="#faad14" />
+            <AnalysisSection title="💡 Suggestions" items={analysisModal.data.suggestions} color="#1677ff" />
+            <AnalysisSection title="🔴 Risks" items={analysisModal.data.risks} color="#ff4d4f" />
+          </div>
+        )}
+      </AntModal>
+    </div>
+  );
+}
+
+// --- AI Agent ---
+function AIAgent() {
+  const [messages, setMessages] = React.useState([]);
+  const [input, setInput] = React.useState("");
+  const [sessionId, setSessionId] = React.useState(null);
+  const [loading, setLoading] = React.useState(false);
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    const userMsg = input.trim();
+    setInput("");
+    setMessages(prev => [...prev, { role: "user", content: userMsg }]);
+    setLoading(true);
+    try {
+      let result;
+      if (!sessionId) {
+        result = await fetch(`${API}/agent/design`, {
+          method: "POST", headers: authHeaders(), body: JSON.stringify({ query: userMsg }),
+        }).then(r => r.json());
+        setSessionId(result.session_id);
+        setMessages(prev => [...prev, { role: "agent", design: result.design }]);
+      } else {
+        result = await fetch(`${API}/agent/followup`, {
+          method: "POST", headers: authHeaders(), body: JSON.stringify({ session_id: sessionId, question: userMsg }),
+        }).then(r => r.json());
+        if (result.error) {
+          setMessages(prev => [...prev, { role: "agent", text: result.error }]);
+        } else {
+          setMessages(prev => [...prev, { role: "agent", text: result.answer, design: result.updated_design }]);
+        }
+      }
+    } catch (e) { setMessages(prev => [...prev, { role: "agent", text: "Error: " + e.message }]); }
+    finally { setLoading(false); }
+  };
+
+  const resetChat = () => { setMessages([]); setSessionId(null); setInput(""); };
+
+  const DesignCard = ({ design }) => {
+    if (!design) return null;
+    return (
+      <div style={{background:"#f6ffed",borderRadius:8,padding:16,marginTop:8}}>
+        <div style={{marginBottom:12}}>{design.recommendation}</div>
+        {design.technique && <div style={{marginBottom:8}}><b>Recommended Technique:</b> <Tag color="blue">{design.technique}</Tag></div>}
+        {design.tools && design.tools.length > 0 && <div style={{marginBottom:8}}><b>Tools:</b> {design.tools.map((t,i)=><Tag key={i}>{t}</Tag>)}</div>}
+        {design.estimated_effort_hours && <div style={{marginBottom:8}}><b>Estimated Effort:</b> ~{design.estimated_effort_hours} hours</div>}
+        {design.expected_outcomes && design.expected_outcomes.length > 0 && (
+          <div style={{marginBottom:8}}><b>Expected Outcomes:</b><ul style={{margin:"4px 0",paddingLeft:20}}>
+            {design.expected_outcomes.map((o,i)=><li key={i} style={{fontSize:13}}>{o}</li>)}
+          </ul></div>
+        )}
+        {design.implementation_steps && design.implementation_steps.length > 0 && (
+          <div style={{marginBottom:8}}><b>Implementation Steps:</b><ol style={{margin:"4px 0",paddingLeft:20}}>
+            {design.implementation_steps.map((s,i)=><li key={i} style={{fontSize:13}}>{s.replace(/^\d+\.\s*/,"")}</li>)}
+          </ol></div>
+        )}
+        {design.matched_cases && design.matched_cases.length > 0 && (
+          <div><b>Reference Cases:</b>
+            {design.matched_cases.map((c,i)=>(
+              <div key={i} style={{background:"#fff",borderRadius:4,padding:8,marginTop:4,fontSize:13}}>
+                <b>{c.title}</b> ({c.program}) — {c.technique}
+                {c.yearly_usd_saved && <span> — ${c.yearly_usd_saved.toLocaleString()}/yr</span>}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <Card title="AI Solution Design Agent" extra={<Button onClick={resetChat} size="small">New Conversation</Button>}>
+      <div style={{minHeight:400,maxHeight:600,overflowY:"auto",marginBottom:16,padding:8}}>
+        {messages.length === 0 && (
+          <div style={{textAlign:"center",color:"#999",padding:40}}>
+            <div style={{fontSize:40,marginBottom:16}}>🤖</div>
+            <div style={{fontSize:16}}>Describe your problem or scenario, and I'll design an AI solution based on our Case Library.</div>
+            <div style={{fontSize:13,marginTop:8,color:"#bbb"}}>Example: "We need to automate invoice processing and detect anomalies"</div>
+          </div>
+        )}
+        {messages.map((msg, i) => (
+          <div key={i} style={{marginBottom:12,display:"flex",justifyContent:msg.role==="user"?"flex-end":"flex-start"}}>
+            <div style={{maxWidth:"85%",padding:12,borderRadius:12,
+              background:msg.role==="user"?"#1677ff":"#f5f5f5",
+              color:msg.role==="user"?"#fff":"#333"}}>
+              {msg.content && <div>{msg.content}</div>}
+              {msg.text && <div>{msg.text}</div>}
+              {msg.design && <DesignCard design={msg.design} />}
+            </div>
+          </div>
+        ))}
+        {loading && <div style={{textAlign:"center",padding:16}}><span>Analyzing...</span></div>}
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        <Input.TextArea value={input} onChange={e=>setInput(e.target.value)} placeholder="Describe your problem..."
+          autoSize={{minRows:1,maxRows:3}} onPressEnter={e=>{if(!e.shiftKey){e.preventDefault();sendMessage();}}} />
+        <Button type="primary" onClick={sendMessage} loading={loading} style={{height:"auto"}}>Send</Button>
+      </div>
+    </Card>
+  );
+}
+
+// --- Main App ---
+function App() {
+  const [currentUser, setCurrentUser] = React.useState(getUser());
+  const [authPage, setAuthPage] = React.useState("login");
+  const [options, setOptions] = React.useState({});
+  const [cases, setCases] = React.useState([]);
+  const [loading, setLoading] = React.useState(false);
+  const [editingCase, setEditingCase] = React.useState(null);
+  const [activeTab, setActiveTab] = React.useState("form");
+
+  const handleLogin = (res) => {
+    localStorage.setItem("token", res.access_token);
+    localStorage.setItem("user", JSON.stringify(res.user));
+    setCurrentUser(res.user);
+  };
+  const handleLogout = () => {
+    localStorage.removeItem("token"); localStorage.removeItem("user");
+    setCurrentUser(null); setAuthPage("login");
+  };
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [opts, data] = await Promise.all([fetchOptions(), fetchCases()]);
+      setOptions(opts); setCases(data);
+    } catch (e) { message.error("Failed to load data"); }
+    finally { setLoading(false); }
+  };
+
+  React.useEffect(() => { if (currentUser) loadData(); }, [currentUser]);
+
+  const handleEdit = (r) => { setEditingCase(r); setActiveTab("form"); };
+
+  // Not logged in — show auth pages
+  if (!currentUser) {
+    if (authPage === "register") return <RegisterPage onLogin={handleLogin} onSwitch={setAuthPage} />;
+    if (authPage === "forgot") return <ForgotPasswordPage onSwitch={setAuthPage} />;
+    if (authPage === "reset") return <ResetPasswordPage onSwitch={setAuthPage} />;
+    return <LoginPage onLogin={handleLogin} onSwitch={setAuthPage} />;
+  }
+
+  const isAdmin = currentUser.role === "admin";
+  const tabItems = [
+    { key: "form", label: "Submit Initiative",
+      children: <CaseForm options={options} editingCase={editingCase} currentUser={currentUser}
+        onSuccess={() => { setEditingCase(null); loadData(); }} onCancelEdit={() => setEditingCase(null)} /> },
+    { key: "list", label: `Browse All (${cases.length})`,
+      children: <CaseList cases={cases} loading={loading} options={options} currentUser={currentUser}
+        onEdit={handleEdit} onRefresh={loadData} /> },
+    { key: "mine", label: "My Initiatives",
+      children: <CaseList cases={cases.filter(c => c.owner_login === currentUser.login)} loading={loading}
+        options={options} currentUser={currentUser} onEdit={handleEdit} onRefresh={loadData} /> },
+    { key: "dashboard", label: "Dashboard",
+      children: <Dashboard /> },
+    { key: "agent", label: "AI Agent",
+      children: <AIAgent /> },
+    { key: "leaderboard", label: "Leaderboard",
+      children: <Leaderboard /> },
+  ];
+
+  // Only show leaderboard for admins
+  if (!isAdmin) {
+    tabItems.splice(tabItems.findIndex(t => t.key === "leaderboard"), 1);
+  }
+
+  const userMenuItems = [
+    { key: "role", label: `Role: ${currentUser.role}`, disabled: true },
+    { key: "logout", label: "Logout", danger: true },
+  ];
+
+  return (
+    <Layout style={{ minHeight: "100vh" }}>
+      <Header style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Title level={3} style={{ color: "white", margin: 0 }}>AI Case Library</Title>
+        <Dropdown menu={{ items: userMenuItems, onClick: ({key}) => { if (key==="logout") handleLogout(); } }}>
+          <Button type="text" style={{ color: "white" }}>
+            {currentUser.display_name} {isAdmin && <Tag color="gold" style={{marginLeft:4}}>ADMIN</Tag>}
+          </Button>
+        </Dropdown>
+      </Header>
+      <Content className="site-layout">
+        <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} size="large" />
+      </Content>
+      <Footer style={{ textAlign: "center" }}>AI Ascent Hackathon 2026</Footer>
+    </Layout>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>

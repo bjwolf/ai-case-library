@@ -1,0 +1,53 @@
+Phase 5: Ranking Engine + AI Analysis
+
+## Part A: Weighted Scoring & Leaderboard
+
+### Scoring Algorithm
+Composite score = weighted sum of normalized metrics (0-100 scale each):
+- Impact (40%): normalized(time_saved) + normalized(cost_reduction) + normalized(accuracy) + normalized(yearly_usd_saved)
+- Scalability (25%): scalability_score * 10
+- Effort Efficiency (20%): yearly_usd_saved / max(dev_time_hours, 1) — ROI per dev hour
+- Innovation (15%): innovation_score * 10
+
+### API Endpoints
+- GET /rankings — returns all cases sorted by composite score
+  - Query params: impact_w, scalability_w, effort_w, innovation_w (default 40,25,20,15)
+- GET /rankings/{case_id}/compare?with={other_id} — side-by-side comparison
+
+### Frontend: "Leaderboard" Tab
+- Ranked table with position (#1, #2, ...), composite score, and breakdown
+- 4 weight sliders (Impact, Scalability, Effort Efficiency, Innovation)
+- Scores recalculate in real-time as sliders move
+- Top 3 highlighted with gold/silver/bronze
+- Side-by-side comparison: select 2 initiatives to compare metrics
+
+## Part B: Real-Time AI Analysis (Amazon Bedrock)
+
+### AI-Powered Insights
+When user clicks "AI Analysis" on any initiative, call Amazon Bedrock to generate:
+1. Strengths & Weaknesses — based on the initiative's metrics vs library averages
+2. Improvement Suggestions — specific recommendations to increase impact
+3. Similar Initiatives — identify patterns from other cases in the library
+4. Risk Assessment — flag potential issues (low accuracy, high dev time, etc.)
+
+### API Endpoint
+- POST /rankings/{case_id}/ai-analysis
+  - Sends case data + library summary to Bedrock Claude
+  - Returns structured AI analysis (strengths, weaknesses, suggestions, risks)
+
+### Frontend
+- "AI Analysis" button on each row in the leaderboard
+- Modal popup showing the AI-generated analysis with sections
+- Loading spinner while Bedrock processes
+
+### Technical Approach
+- Use boto3 with Amazon Bedrock Runtime (invoke_model)
+- Model: anthropic.claude-3-haiku (fast, cheap) or claude-3-sonnet
+- Prompt includes: case details, library averages, top performers for context
+- Response parsed as structured JSON
+- Fallback: if Bedrock unavailable, show "AI analysis requires AWS credentials"
+
+### Configuration
+- AWS credentials via environment variables or ~/.aws/credentials
+- Model ID configurable in constants.py
+- Max tokens: 1024 for analysis

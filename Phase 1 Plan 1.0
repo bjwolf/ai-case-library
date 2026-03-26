@@ -1,0 +1,17 @@
+Phase 1: Project Foundation & Data Layer
+Tech stack recommendation: Python (FastAPI backend) + React frontend + SQLite (or DynamoDB if you want AWS-native). This keeps it hackathon-friendly.
+
+What I'd build:
+
+FastAPI project scaffold with CORS, error handling
+SQLAlchemy models for the Case Library schema (Case ID, Owner Login, Job Level, Program/Team, Use Case Title, Problem Statement, AI Technique, Tools/Services, Key Prompts, Input Data, Output/Outcome, Performance Metrics, Status, Date, Rank)
+Auto-generated fields: Case ID (UUID), Date (timestamp), Rank (computed)
+Database migrations with Alembic
+CRUD API endpoints: POST /cases, GET /cases, GET /cases/{id}, PUT /cases/{id}, DELETE /cases/{id}
+Seed data script with sample cases
+
+Preference:
+Tech stack (I suggested FastAPI + React + SQLite — good with that)
+Simple/local solution
+Any specific UI framework preference - Ant Design
+
