@@ -65,3 +65,27 @@ def get_trends(db: Session):
         func.count(Case.id).label("count"),
     ).group_by(func.strftime("%Y-%m", Case.date_created)).order_by("month").all()
     return [{"month": r.month, "count": r.count} for r in rows]
+
+
+def get_by_platform(db: Session):
+    rows = db.query(
+        Case.platform,
+        func.count(Case.id).label("count"),
+    ).filter(Case.platform.isnot(None)).group_by(Case.platform).all()
+    return [{"platform": r.platform or "Unknown", "count": r.count} for r in rows]
+
+
+def get_by_dev_type(db: Session):
+    rows = db.query(
+        Case.dev_type,
+        func.count(Case.id).label("count"),
+    ).filter(Case.dev_type.isnot(None)).group_by(Case.dev_type).all()
+    return [{"dev_type": r.dev_type or "Unknown", "count": r.count} for r in rows]
+
+
+def get_by_chatbot(db: Session):
+    rows = db.query(
+        Case.is_chatbot,
+        func.count(Case.id).label("count"),
+    ).filter(Case.is_chatbot.isnot(None)).group_by(Case.is_chatbot).all()
+    return [{"is_chatbot": r.is_chatbot or "Unknown", "count": r.count} for r in rows]

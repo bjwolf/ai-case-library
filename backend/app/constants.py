@@ -30,3 +30,9 @@ AI_TECHNIQUES = [
 ]
 
 STATUSES = ["Developing", "UAT", "In Production"]
+
+PLATFORMS = ["PartyRock", "Quick Suite", "AgentZ", "Bedrock", "Custom", "Other"]
+
+DEV_TYPES = ["No code", "Low code", "High Code"]
+
+IS_CHATBOT = ["Yes", "No"]

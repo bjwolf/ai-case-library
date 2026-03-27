@@ -4,15 +4,17 @@ from pydantic import BaseModel, Field
 
 
 class CaseCreate(BaseModel):
-    owner_login: str
+    owner_login: Optional[str] = None
     job_level: Optional[str] = None
     program_team: str
     use_case_title: str
     problem_statement: str
     ai_technique: str
+    platform: Optional[str] = None
+    dev_type: Optional[str] = None
+    is_chatbot: Optional[str] = None
     tools_services: Optional[str] = None
     key_prompts: Optional[str] = None
-    input_data: Optional[str] = None
     output_outcome: Optional[str] = None
     solution_description: Optional[str] = None
     time_saved: Optional[float] = None
@@ -33,9 +35,11 @@ class CaseUpdate(BaseModel):
     use_case_title: Optional[str] = None
     problem_statement: Optional[str] = None
     ai_technique: Optional[str] = None
+    platform: Optional[str] = None
+    dev_type: Optional[str] = None
+    is_chatbot: Optional[str] = None
     tools_services: Optional[str] = None
     key_prompts: Optional[str] = None
-    input_data: Optional[str] = None
     output_outcome: Optional[str] = None
     solution_description: Optional[str] = None
     time_saved: Optional[float] = None
@@ -57,9 +61,11 @@ class CaseResponse(BaseModel):
     use_case_title: str
     problem_statement: str
     ai_technique: str
+    platform: Optional[str]
+    dev_type: Optional[str]
+    is_chatbot: Optional[str]
     tools_services: Optional[str]
     key_prompts: Optional[str]
-    input_data: Optional[str]
     output_outcome: Optional[str]
     solution_description: Optional[str]
     time_saved: Optional[float]

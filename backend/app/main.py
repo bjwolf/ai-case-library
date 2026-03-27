@@ -11,7 +11,7 @@ import io
 from app.database import engine, get_db, Base
 from app.schemas import CaseCreate, CaseUpdate, CaseResponse
 from app import crud
-from app.constants import JOB_LEVELS, PROGRAMS_TEAMS, AI_TECHNIQUES, STATUSES
+from app.constants import JOB_LEVELS, PROGRAMS_TEAMS, AI_TECHNIQUES, STATUSES, PLATFORMS, DEV_TYPES, IS_CHATBOT
 from app.models import User
 from app import analytics as analytics_mod
 from app.ranking import get_rankings, generate_ai_analysis
@@ -100,6 +100,45 @@ def reset_password(data: PasswordResetConfirm, db: Session = Depends(get_db)):
     return {"detail": "Password reset successful"}
 
 
+@app.get("/admin/users")
+def list_users(db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    users = db.query(User).all()
+    return [{"id": u.id, "login": u.login, "email": u.email, "display_name": u.display_name, "role": u.role, "is_active": u.is_active} for u in users]
+
+@app.put("/admin/users/{user_id}/role")
+def update_user_role(user_id: str, body: dict, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(404, "User not found")
+    if body.get("role") not in ("learner", "admin"):
+        raise HTTPException(400, "Role must be 'learner' or 'admin'")
+    target.role = body["role"]
+    db.commit()
+    return {"detail": f"Role updated to {body['role']}"}
+
+@app.delete("/admin/users/{user_id}")
+def delete_user(user_id: str, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    target = db.query(User).filter(User.id == user_id).first()
+    if not target:
+        raise HTTPException(404, "User not found")
+    if target.login == "admin":
+        raise HTTPException(400, "Cannot delete the default admin")
+    db.delete(target)
+    db.commit()
+    return {"detail": "User deleted"}
+
+@app.post("/admin/users")
+def admin_create_user(body: dict, db: Session = Depends(get_db), user: User = Depends(require_admin)):
+    if db.query(User).filter(User.login == body.get("login")).first():
+        raise HTTPException(400, "Login already taken")
+    new_user = User(
+        login=body["login"], email=body.get("email", ""), display_name=body.get("display_name", body["login"]),
+        hashed_password=hash_password(body.get("password", "changeme")), role=body.get("role", "learner"),
+    )
+    db.add(new_user); db.commit()
+    return {"detail": f"User {body['login']} created"}
+
+
 @app.post("/cases", response_model=CaseResponse, status_code=201)
 def create_case(case: CaseCreate, db: Session = Depends(get_db), user: User = Depends(require_user)):
     case.owner_login = user.login
@@ -131,6 +170,9 @@ def get_options():
         "programs_teams": PROGRAMS_TEAMS,
         "ai_techniques": AI_TECHNIQUES,
         "statuses": STATUSES,
+        "platforms": PLATFORMS,
+        "dev_types": DEV_TYPES,
+        "is_chatbot": IS_CHATBOT,
     }
 
 
@@ -191,6 +233,18 @@ def analytics_by_status(db: Session = Depends(get_db)):
 def analytics_trends(db: Session = Depends(get_db)):
     return analytics_mod.get_trends(db)
 
+@app.get("/analytics/by-platform")
+def analytics_by_platform(db: Session = Depends(get_db)):
+    return analytics_mod.get_by_platform(db)
+
+@app.get("/analytics/by-dev-type")
+def analytics_by_dev_type(db: Session = Depends(get_db)):
+    return analytics_mod.get_by_dev_type(db)
+
+@app.get("/analytics/by-chatbot")
+def analytics_by_chatbot(db: Session = Depends(get_db)):
+    return analytics_mod.get_by_chatbot(db)
+
 
 @app.get("/cases/export")
 def export_cases_csv(db: Session = Depends(get_db)):
@@ -198,14 +252,14 @@ def export_cases_csv(db: Session = Depends(get_db)):
     output = io.StringIO()
     writer = csv.writer(output)
     headers = ["ID","Owner","Job Level","Program/Team","Title","Problem Statement","Solution Description",
-               "AI Technique","Tools/Services","Key Prompts","Input Data","Output/Outcome",
+               "AI Technique","Tools/Services","Key Prompts","Output/Outcome",
                "Time Saved %","Yearly HC Saved","Accuracy %","Cost Reduction %","Yearly USD Saved",
                "Dev Time Hours","Status","Scalability","Innovation","Date Created"]
     writer.writerow(headers)
     for c in cases:
         writer.writerow([c.id, c.owner_login, c.job_level, c.program_team, c.use_case_title,
             c.problem_statement, c.solution_description, c.ai_technique, c.tools_services,
-            c.key_prompts, c.input_data, c.output_outcome, c.time_saved, c.yearly_hc_saved,
+            c.key_prompts, c.output_outcome, c.time_saved, c.yearly_hc_saved,
             c.accuracy, c.cost_reduction, c.yearly_usd_saved, c.dev_time_hours, c.status,
             c.scalability_score, c.innovation_score, c.date_created])
     output.seek(0)
