@@ -72,11 +72,11 @@
 </div>
 <div class="section-hdr">📋 Project Details</div>
 <div class="form-row">
-  <div class="form-group"><label>Problem Statement *</label><textarea name="problem_statement" rows="3" required></textarea></div>
-  <div class="form-group"><label>Proposed Solution</label><textarea name="solution_description" rows="3"></textarea></div>
-  <div class="form-group"><label>Impact Expected</label><textarea name="output_outcome" rows="3"></textarea></div>
+  <div class="form-group"><label>Problem Statement *</label><textarea name="problem_statement" rows="3" required maxlength="3000"></textarea></div>
+  <div class="form-group"><label>Proposed Solution</label><textarea name="solution_description" rows="3" maxlength="3000"></textarea></div>
+  <div class="form-group"><label>Impact Expected</label><textarea name="output_outcome" rows="3" maxlength="3000"></textarea></div>
 </div>
-<div class="form-row"><div class="form-group"><label>Tools / Services</label><input name="tools_services"></div><div class="form-group"><label>Key Prompts</label><input name="key_prompts"></div></div>
+<div class="form-row"><div class="form-group"><label>Tools / Services</label><input name="tools_services" maxlength="600"></div><div class="form-group"><label>Key Prompts</label><input name="key_prompts" maxlength="10000"></div></div>
 <div class="section-hdr">📊 Impact & Benefits</div>
 <div class="form-row">
   <div class="form-group"><label>Time Saved %</label><input name="time_saved" type="number" step="0.1"></div>

@@ -179,6 +179,12 @@ def api_get_case(case_id: str):
 async def api_create_case(request: Request):
     user = get_user(request)
     data = await request.json()
+    # Whitelist allowed fields
+    ALLOWED_FIELDS = {"use_case_title","job_level","program_team","problem_statement","solution_description",
+        "output_outcome","ai_technique","platform","dev_type","is_chatbot","tools_services","key_prompts",
+        "status","time_saved","yearly_hc_saved","accuracy","cost_reduction","yearly_usd_saved",
+        "dev_time_hours","scalability_score","innovation_score"}
+    data = {k: v for k, v in data.items() if k in ALLOWED_FIELDS}
     data["id"] = str(uuid.uuid4())
     data["owner_login"] = user
     data["date_created"] = datetime.utcnow().isoformat()
@@ -190,6 +196,13 @@ async def api_create_case(request: Request):
             except: pass
         elif f in data and data[f] == "":
             data[f] = None
+    # Validate text length limits
+    LIMITS = {"problem_statement":3000,"solution_description":3000,"output_outcome":3000,"key_prompts":10000}
+    DEFAULT_LIMIT = 600
+    TEXT_FIELDS = ["use_case_title","problem_statement","solution_description","output_outcome","tools_services","key_prompts","job_level","program_team","ai_technique","platform","dev_type","is_chatbot","status"]
+    for f in TEXT_FIELDS:
+        if f in data and data[f] and len(str(data[f])) > LIMITS.get(f, DEFAULT_LIMIT):
+            raise HTTPException(400, f"Field '{f}' exceeds maximum length of {LIMITS.get(f, DEFAULT_LIMIT)} characters")
     cases = store.get_json("cases", [])
     cases.append(data)
     store.put_json("cases", cases)
@@ -205,12 +218,25 @@ async def api_update_case(case_id: str, request: Request):
         raise HTTPException(404, "Not found")
     if not is_admin(user) and cases[idx].get("owner_login") != user:
         raise HTTPException(403, "Not your case")
+    # Whitelist allowed fields
+    ALLOWED_FIELDS = {"use_case_title","job_level","program_team","problem_statement","solution_description",
+        "output_outcome","ai_technique","platform","dev_type","is_chatbot","tools_services","key_prompts",
+        "status","time_saved","yearly_hc_saved","accuracy","cost_reduction","yearly_usd_saved",
+        "dev_time_hours","scalability_score","innovation_score"}
+    data = {k: v for k, v in data.items() if k in ALLOWED_FIELDS}
     for f in ["time_saved","yearly_hc_saved","accuracy","cost_reduction","yearly_usd_saved","dev_time_hours","scalability_score","innovation_score"]:
         if f in data and data[f] not in (None, ""):
             try: data[f] = float(data[f])
             except: pass
         elif f in data and data[f] == "":
             data[f] = None
+    # Validate text length limits
+    LIMITS = {"problem_statement":3000,"solution_description":3000,"output_outcome":3000,"key_prompts":10000}
+    DEFAULT_LIMIT = 600
+    TEXT_FIELDS = ["use_case_title","problem_statement","solution_description","output_outcome","tools_services","key_prompts","job_level","program_team","ai_technique","platform","dev_type","is_chatbot","status"]
+    for f in TEXT_FIELDS:
+        if f in data and data[f] and len(str(data[f])) > LIMITS.get(f, DEFAULT_LIMIT):
+            raise HTTPException(400, f"Field '{f}' exceeds maximum length of {LIMITS.get(f, DEFAULT_LIMIT)} characters")
     data["date_updated"] = datetime.utcnow().isoformat()
     cases[idx].update({k: v for k, v in data.items() if v is not None or k in data})
     store.put_json("cases", cases)
