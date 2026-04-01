@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GSRC AI Initiatives Repository</title>
+<style>
+:root{--bg:#060d19;--card:#0b1a2e;--input:#070e1a;--border:#0f3460;--text:#e4ecf7;--dim:#5a7fa0;--accent:#00e5ff;--accent2:#ffc107;--success:#00e676;--warn:#ffab00;--danger:#ff5252;--glow:rgba(0,229,255,0.15)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;
+  background-image:radial-gradient(circle at 20% 50%,rgba(0,229,255,0.03) 0%,transparent 50%),radial-gradient(rgba(15,52,96,0.4) 1px,transparent 1px);background-size:100%,24px 24px}
+a{color:var(--accent);text-decoration:none}
+.header{background:linear-gradient(135deg,#0d2137,#0a1929);padding:12px 24px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.header h1{font-size:20px;color:var(--accent);font-weight:700}
+.header .sub{font-size:11px;color:var(--dim)}
+.header .user-info{color:var(--text);font-size:13px}
+.header .badge{background:var(--accent2);color:#000;padding:1px 8px;border-radius:10px;font-size:11px;margin-left:4px}
+.container{max-width:1400px;margin:0 auto;padding:16px 24px}
+.tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:2px solid var(--border);padding-bottom:0}
+.tab{padding:8px 16px;color:var(--dim);cursor:pointer;border-bottom:3px solid transparent;font-weight:500;font-size:13px;text-decoration:none;transition:all 0.2s}
+.tab:hover{color:var(--accent)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600}
+.card{background:linear-gradient(135deg,var(--card),rgba(11,26,46,0.8));border:1px solid var(--border);border-radius:10px;padding:16px;margin-bottom:12px;transition:all 0.3s}
+.card:hover{border-color:rgba(0,229,255,0.3);box-shadow:0 0 20px rgba(0,229,255,0.05)}
+.card-title{color:var(--accent);font-weight:600;margin-bottom:12px;font-size:14px}
+.stat-card{text-align:center;position:relative;overflow:hidden;animation:pulse 4s ease-in-out infinite}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--accent),transparent)}
+.stat-val{font-size:24px;font-weight:700}.stat-lbl{font-size:10px;color:var(--dim);text-transform:uppercase;letter-spacing:1px;margin-top:2px}
+@keyframes pulse{0%,100%{box-shadow:0 0 5px var(--glow)}50%{box-shadow:0 0 15px var(--glow)}}
+</style>
+</head>
+<body>
+<div class="header">
+  <div><h1>🚀 GSRC AI Initiatives Repository</h1><div class="sub">Track, manage, and analyze AI-powered solutions</div></div>
+  <div class="user-info">👤 {{ user }} {% if role == 'admin' %}<span class="badge">ADMIN</span> <a href="#" onclick="openUserMgmt();return false" style="color:var(--accent);font-size:12px;margin-left:8px">👥 Users</a>{% endif %}</div>
+</div>
+<div class="container">
+  <div class="tabs">
+    <a class="tab {% if tab=='browse' %}active{% endif %}" href="./">📋 Browse</a>
+    <a class="tab {% if tab=='mine' %}active{% endif %}" href="./mine">👤 My Initiatives</a>
+    <a class="tab {% if tab=='dashboard' %}active{% endif %}" href="./dashboard">📊 Dashboard</a>
+    <a class="tab {% if tab=='agent' %}active{% endif %}" href="./agent">🤖 AI Agent</a>
+    {% if role == 'admin' %}<a class="tab {% if tab=='leaderboard' %}active{% endif %}" href="./leaderboard">🏆 Leaderboard</a>{% endif %}
+  </div>
+  {% block content %}{% endblock %}
+</div>
+<div style="text-align:center;padding:16px;color:var(--dim);border-top:1px solid var(--border);font-size:12px">AI Ascent Hackathon 2026</div>
+<script>
+// Base URL for API calls — works on both local and Canopy
+const BASE = document.querySelector('base')?.href || window.location.pathname.replace(/[^/]*$/,'');
+function apiUrl(path){ return BASE + path; }
+</script>
+<!-- User Management Modal (admin only) -->
+{% if role == 'admin' %}
+<div id="userMgmtModal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;justify-content:center;align-items:flex-start;padding-top:40px" onclick="if(event.target===this)this.style.display='none'">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;width:90%;max-width:650px;padding:24px">
+    <div style="display:flex;justify-content:space-between;margin-bottom:16px">
+      <span style="color:var(--accent);font-weight:bold;font-size:16px">👥 User Management</span>
+      <button onclick="document.getElementById('userMgmtModal').style.display='none'" style="background:none;border:none;color:var(--dim);cursor:pointer;font-size:16px">✕</button>
+    </div>
+    <div id="addUserRow" style="display:none;background:var(--bg);padding:10px;border-radius:6px;margin-bottom:12px;border:1px solid var(--border)">
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        <input id="nuLogin" placeholder="Login" style="flex:1;padding:6px;background:var(--input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
+        <input id="nuName" placeholder="Name" style="flex:1;padding:6px;background:var(--input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px">
+        <select id="nuRole" style="padding:6px;background:var(--input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px"><option value="learner">learner</option><option value="admin">admin</option></select>
+        <button onclick="addUser()" style="padding:6px 12px;background:var(--accent);border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:12px">Add</button>
+      </div>
+    </div>
+    <button onclick="document.getElementById('addUserRow').style.display=document.getElementById('addUserRow').style.display==='none'?'block':'none'" style="padding:4px 12px;background:var(--accent);border:none;border-radius:4px;color:#fff;cursor:pointer;font-size:12px;margin-bottom:12px">+ Add User</button>
+    <table style="width:100%;border-collapse:collapse;font-size:13px" id="userTable">
+      <thead><tr><th style="background:#0a1525;color:var(--accent);padding:6px 8px;text-align:left;border-bottom:2px solid var(--border)">Login</th><th style="background:#0a1525;color:var(--accent);padding:6px 8px;text-align:left;border-bottom:2px solid var(--border)">Role</th><th style="background:#0a1525;color:var(--accent);padding:6px 8px;text-align:left;border-bottom:2px solid var(--border)"></th></tr></thead>
+      <tbody id="userTableBody"></tbody>
+    </table>
+  </div>
+</div>
+<script>
+async function openUserMgmt(){
+  document.getElementById("userMgmtModal").style.display="flex";
+  const users=await fetch("./api/admin/users").then(r=>r.json());
+  document.getElementById("userTableBody").innerHTML=users.map(u=>`<tr>
+    <td style="padding:5px 8px;border-bottom:1px solid rgba(15,52,96,0.5)">${u.login}</td>
+    <td style="padding:5px 8px;border-bottom:1px solid rgba(15,52,96,0.5)"><select onchange="changeRole('${u.login}',this.value)" style="padding:4px;background:var(--input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px"><option value="learner" ${u.role==='learner'?'selected':''}>learner</option><option value="admin" ${u.role==='admin'?'selected':''}>admin</option></select></td>
+    <td style="padding:5px 8px;border-bottom:1px solid rgba(15,52,96,0.5)">${u.login!=='guoweim'?`<button onclick="delUser('${u.login}')" style="padding:2px 8px;background:transparent;border:1px solid var(--danger);color:var(--danger);border-radius:4px;cursor:pointer;font-size:11px">Del</button>`:''}</td>
+  </tr>`).join('');
+}
+async function changeRole(login,role){await fetch(`api/admin/users/${login}/role`,{method:"PUT",headers:{"Content-Type":"application/json"},body:JSON.stringify({role})});openUserMgmt()}
+async function delUser(login){if(!confirm("Delete "+login+"?"))return;await fetch(`api/admin/users/${login}`,{method:"DELETE"});openUserMgmt()}
+async function addUser(){
+  const login=document.getElementById("nuLogin").value;const role=document.getElementById("nuRole").value;
+  if(!login){alert("Login required");return}
+  await fetch("./api/admin/users",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({login,display_name:document.getElementById("nuName").value||login,role})});
+  document.getElementById("nuLogin").value="";document.getElementById("nuName").value="";openUserMgmt();
+}
+</script>
+{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>
+

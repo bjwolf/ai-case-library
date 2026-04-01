@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.stats-row{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:16px}
+.chart-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.chart-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.bar-row{display:flex;align-items:center;margin-bottom:5px}
+.bar-label{width:120px;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;background:var(--bg);border-radius:4px;height:16px;margin-right:8px}
+.bar-fill{height:16px;border-radius:4px;transition:width 0.3s}
+.bar-val{width:50px;text-align:right;font-size:11px}
+.donut{display:flex;align-items:center;gap:16px}
+.donut-circle{width:100px;height:100px;border-radius:50%;position:relative;flex-shrink:0}
+.donut-circle::after{content:'';position:absolute;top:25%;left:25%;width:50%;height:50%;border-radius:50%;background:var(--card)}
+.donut-legend{font-size:11px;color:var(--dim)}
+.donut-legend div{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.donut-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+table.data-table{width:100%;border-collapse:collapse;font-size:12px}
+table.data-table th{background:#0a1525;color:var(--accent);padding:6px 8px;text-align:left;border-bottom:2px solid var(--border);text-transform:uppercase;font-size:11px;letter-spacing:0.5px}
+table.data-table td{padding:5px 8px;border-bottom:1px solid rgba(15,52,96,0.5)}
+table.data-table tr:hover td{background:rgba(0,229,255,0.04)}
+</style>
+<div id="dashboard"></div>
+{% endblock %}
+{% block scripts %}
+<script>
+const COLORS=["#00e5ff","#00e676","#ffc107","#ff5252","#9c27b0","#009688","#e91e63","#ff9800","#3f51b5","#8bc34a"];
+const scm={"Developing":"#00e5ff","UAT":"#ffab00","In Production":"#00e676"};
+async function loadDashboard(){
+  const[summary,byProg,byTech,byStat,trends,byPlat,byDev,byCb,cases]=await Promise.all([
+    fetch("./api/analytics/summary").then(r=>r.json()),fetch("./api/analytics/by-program").then(r=>r.json()),
+    fetch("./api/analytics/by-technique").then(r=>r.json()),fetch("./api/analytics/by-status").then(r=>r.json()),
+    fetch("./api/analytics/trends").then(r=>r.json()),fetch("./api/analytics/by-platform").then(r=>r.json()),
+    fetch("./api/analytics/by-dev-type").then(r=>r.json()),fetch("./api/analytics/by-chatbot").then(r=>r.json()),
+    fetch("./api/cases").then(r=>r.json())]);
+  const s=summary;
+  const mkBar=(items,labelKey,valKey,maxV,color)=>items.map((r,i)=>{const pct=maxV>0?(r[valKey]/maxV)*100:0;return`<div class="bar-row"><div class="bar-label">${r[labelKey]}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${typeof color==='function'?color(r,i):color}"></div></div><div class="bar-val">${r[valKey]}</div></div>`}).join('');
+  const mkDonut=(items,labelKey,valKey,colors)=>{const total=items.reduce((s,r)=>s+r[valKey],0);let cum=0;const parts=items.map((r,i)=>{const p=total>0?(r[valKey]/total)*100:0;const st=cum;cum+=p;return`${colors[i%colors.length]} ${st}% ${cum}%`});
+    return`<div class="donut"><div class="donut-circle" style="background:conic-gradient(${parts.join(',')})"></div><div class="donut-legend">${items.map((r,i)=>`<div><div class="donut-dot" style="background:${colors[i%colors.length]}"></div>${r[labelKey]}: ${r[valKey]}</div>`).join('')}</div></div>`};
+  const maxProg=Math.max(...byProg.map(r=>r.count),1);const maxUsd=Math.max(...byProg.map(r=>r.total_usd_saved),1);
+  const dtColors={"No code":"#00e676","Low code":"#ffc107","High Code":"#ff5252"};
+  const cbColors={"Yes":"#00e5ff","No":"#555"};
+  let html=`<div class="stats-row">
+    ${[{v:s.total,l:"Initiatives",c:"var(--accent)",i:"🚀"},{v:s.avg_time_saved+"%",l:"Avg Time Saved",c:"var(--accent2)",i:"⏱"},{v:s.total_hc_saved,l:"HC Saved/yr",c:"var(--success)",i:"👥"},{v:"$"+Number(s.total_usd_saved).toLocaleString(),l:"USD Saved/yr",c:"var(--accent2)",i:"💰"},{v:s.total_dev_hours+"h",l:"Dev Hours",c:"var(--accent)",i:"🔧"},{v:s.avg_accuracy+"%",l:"Avg Accuracy",c:"var(--success)",i:"🎯"}].map(x=>`<div class="card stat-card"><div style="font-size:10px;color:var(--dim)">${x.i} ${x.l}</div><div class="stat-val" style="color:${x.c}">${x.v}</div></div>`).join('')}</div>`;
+  html+=`<div class="chart-row"><div class="card"><div class="card-title">📊 Platform</div>${byPlat.length?mkBar(byPlat,"platform","count",Math.max(...byPlat.map(r=>r.count),1),(r,i)=>COLORS[i%10]):'<div style="color:var(--dim)">No data</div>'}</div>
+    <div class="card"><div class="card-title">📈 Status</div>${mkBar(byStat,"status","count",Math.max(...byStat.map(r=>r.count),1),(r)=>scm[r.status]||'#999')}</div></div>`;
+  html+=`<div class="chart-row-3"><div class="card"><div class="card-title">🔧 AI Technique</div>${mkDonut(byTech,"technique","count",COLORS)}</div>
+    <div class="card"><div class="card-title">💻 Dev Type</div>${byDev.length?mkDonut(byDev,"dev_type","count",byDev.map(r=>dtColors[r.dev_type]||'#999')):'<div style="color:var(--dim)">No data</div>'}</div>
+    <div class="card"><div class="card-title">🤖 Chatbot</div>${byCb.length?mkDonut(byCb,"is_chatbot","count",byCb.map(r=>cbColors[r.is_chatbot]||'#999')):'<div style="color:var(--dim)">No data</div>'}</div></div>`;
+  html+=`<div class="chart-row"><div class="card"><div class="card-title">💰 USD Saved by Program</div>${mkBar([...byProg].sort((a,b)=>b.total_usd_saved-a.total_usd_saved),"program","total_usd_saved",maxUsd,"var(--accent2)")}</div>
+    <div class="card"><div class="card-title">📅 Timeline</div><div style="display:flex;align-items:flex-end;height:100px;gap:4px">${trends.map(r=>{const maxT=Math.max(...trends.map(x=>x.count),1);return`<div style="flex:1;text-align:center"><div style="background:var(--accent);border-radius:3px 3px 0 0;height:${maxT>0?(r.count/maxT)*80:0}px;min-height:${r.count>0?4:0}px"></div><div style="font-size:9px;color:var(--dim);margin-top:4px">${r.month}</div></div>`}).join('')}</div></div></div>`;
+  html+=`<div class="card"><div class="card-title">📋 All Solutions Data</div>
+    <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+      <select id="fOwner" onchange="filterTable()" style="padding:4px 8px;background:var(--input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px"><option value="">All Owners</option>${[...new Set(cases.map(c=>c.owner_login).filter(Boolean))].map(v=>`<option>${v}</option>`).join('')}</select>
+      <select id="fProgram" onchange="filterTable()" style="padding:4px 8px;background:var(--input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px"><option value="">All Programs</option>${[...new Set(cases.map(c=>c.program_team).filter(Boolean))].map(v=>`<option>${v}</option>`).join('')}</select>
+      <select id="fTechnique" onchange="filterTable()" style="padding:4px 8px;background:var(--input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px"><option value="">All Techniques</option>${[...new Set(cases.map(c=>c.ai_technique).filter(Boolean))].map(v=>`<option>${v}</option>`).join('')}</select>
+      <select id="fPlatform" onchange="filterTable()" style="padding:4px 8px;background:var(--input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px"><option value="">All Platforms</option>${[...new Set(cases.map(c=>c.platform).filter(Boolean))].map(v=>`<option>${v}</option>`).join('')}</select>
+      <select id="fDevType" onchange="filterTable()" style="padding:4px 8px;background:var(--input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px"><option value="">All Dev Types</option>${[...new Set(cases.map(c=>c.dev_type).filter(Boolean))].map(v=>`<option>${v}</option>`).join('')}</select>
+      <select id="fChatbot" onchange="filterTable()" style="padding:4px 8px;background:var(--input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px"><option value="">All Chatbot</option><option>Yes</option><option>No</option></select>
+      <select id="fStatus" onchange="filterTable()" style="padding:4px 8px;background:var(--input);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:11px"><option value="">All Status</option>${[...new Set(cases.map(c=>c.status).filter(Boolean))].map(v=>`<option>${v}</option>`).join('')}</select>
+      <button onclick="document.querySelectorAll('#fOwner,#fProgram,#fTechnique,#fPlatform,#fDevType,#fChatbot,#fStatus').forEach(s=>s.value='');filterTable()" style="padding:4px 8px;background:transparent;border:1px solid var(--danger);border-radius:4px;color:var(--danger);font-size:11px;cursor:pointer">✕ Clear</button>
+    </div>
+    <table class="data-table"><thead><tr>
+      <th style="cursor:pointer" onclick="sortTable(0)">Title ⇅</th><th style="cursor:pointer" onclick="sortTable(1)">Owner ⇅</th><th style="cursor:pointer" onclick="sortTable(2)">Program ⇅</th><th style="cursor:pointer" onclick="sortTable(3)">Technique ⇅</th><th style="cursor:pointer" onclick="sortTable(4)">Platform ⇅</th><th style="cursor:pointer" onclick="sortTable(5)">Dev Type ⇅</th><th style="cursor:pointer" onclick="sortTable(6)">Chatbot ⇅</th><th style="cursor:pointer" onclick="sortTable(7)">Status ⇅</th><th style="cursor:pointer" onclick="sortTable(8,'num')">Time% ⇅</th><th style="cursor:pointer" onclick="sortTable(9,'num')">HC/yr ⇅</th><th style="cursor:pointer" onclick="sortTable(10,'num')">Acc% ⇅</th><th style="cursor:pointer" onclick="sortTable(11,'num')">USD/yr ⇅</th><th style="cursor:pointer" onclick="sortTable(12,'num')">Dev Hrs ⇅</th>
+    </tr></thead><tbody id="dataTableBody">${cases.map(c=>`<tr>
+      <td>${c.use_case_title||''}</td><td>${c.owner_login||''}</td><td>${c.program_team||''}</td><td>${c.ai_technique||''}</td><td>${c.platform||'-'}</td><td>${c.dev_type||'-'}</td><td>${c.is_chatbot||'-'}</td><td><span class="tag" style="background:${scm[c.status]||'#999'};color:#fff">${c.status||''}</span></td><td>${c.time_saved!=null?c.time_saved+'%':'-'}</td><td>${c.yearly_hc_saved!=null?c.yearly_hc_saved:'-'}</td><td>${c.accuracy!=null?c.accuracy+'%':'-'}</td><td>${c.yearly_usd_saved!=null?'$'+Number(c.yearly_usd_saved).toLocaleString():'-'}</td><td>${c.dev_time_hours!=null?c.dev_time_hours+'h':'-'}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+  document.getElementById("dashboard").innerHTML=html;
+  window._allCases=cases;
+}
+function filterTable(){
+  const fO=document.getElementById("fOwner").value;const fP=document.getElementById("fProgram").value;
+  const fT=document.getElementById("fTechnique").value;const fPl=document.getElementById("fPlatform").value;
+  const fD=document.getElementById("fDevType").value;const fC=document.getElementById("fChatbot").value;
+  const fS=document.getElementById("fStatus").value;
+  const scm={"Developing":"#00e5ff","UAT":"#ffab00","In Production":"#00e676"};
+  const rows=(window._allCases||[]).filter(c=>{
+    if(fO&&c.owner_login!==fO)return false;if(fP&&c.program_team!==fP)return false;
+    if(fT&&c.ai_technique!==fT)return false;if(fPl&&c.platform!==fPl)return false;
+    if(fD&&c.dev_type!==fD)return false;if(fC&&c.is_chatbot!==fC)return false;
+    if(fS&&c.status!==fS)return false;return true;
+  });
+  document.getElementById("dataTableBody").innerHTML=rows.map(c=>`<tr><td>${c.use_case_title||''}</td><td>${c.owner_login||''}</td><td>${c.program_team||''}</td><td>${c.ai_technique||''}</td><td>${c.platform||'-'}</td><td>${c.dev_type||'-'}</td><td>${c.is_chatbot||'-'}</td><td><span class="tag" style="background:${scm[c.status]||'#999'};color:#fff">${c.status||''}</span></td><td>${c.time_saved!=null?c.time_saved+'%':'-'}</td><td>${c.yearly_hc_saved!=null?c.yearly_hc_saved:'-'}</td><td>${c.accuracy!=null?c.accuracy+'%':'-'}</td><td>${c.yearly_usd_saved!=null?'$'+Number(c.yearly_usd_saved).toLocaleString():'-'}</td><td>${c.dev_time_hours!=null?c.dev_time_hours+'h':'-'}</td></tr>`).join('');
+}
+let sortDir={};
+function sortTable(col,type){
+  const tb=document.getElementById("dataTableBody");const rows=[...tb.querySelectorAll("tr")];
+  sortDir[col]=!sortDir[col];const dir=sortDir[col]?1:-1;
+  rows.sort((a,b)=>{let va=a.cells[col].textContent.trim();let vb=b.cells[col].textContent.trim();
+    if(type==='num'){va=parseFloat(va.replace(/[$,%h]/g,''))||0;vb=parseFloat(vb.replace(/[$,%h]/g,''))||0;return(va-vb)*dir}
+    return va.localeCompare(vb)*dir;
+  });
+  rows.forEach(r=>tb.appendChild(r));
+}
+loadDashboard();
+</script>
+{% endblock %}
+

@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.filters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.pill{display:inline-flex;padding:5px 14px;border-radius:20px;font-size:12px;cursor:pointer;border:1px solid var(--border);color:var(--dim);background:transparent;transition:all 0.25s;font-weight:500}
+.pill:hover,.pill.on{border-color:var(--accent);color:#fff;background:rgba(0,229,255,0.15);box-shadow:0 0 10px rgba(0,229,255,0.1)}
+.search-box{flex:1;min-width:200px;padding:8px 12px;background:var(--input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;outline:none}
+.search-box:focus{border-color:var(--accent);box-shadow:0 0 8px rgba(0,229,255,0.1)}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.init-card{background:linear-gradient(135deg,var(--card),rgba(6,13,25,0.8));border:1px solid var(--border);border-radius:10px;padding:16px;transition:all 0.3s;cursor:pointer;position:relative;overflow:hidden}
+.init-card:hover{border-color:var(--accent);box-shadow:0 4px 20px rgba(0,229,255,0.08);transform:translateY(-1px)}
+.tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-right:3px}
+.btn{padding:6px 16px;border:none;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600;transition:all 0.2s}
+.btn-primary{background:linear-gradient(135deg,#00bcd4,#0097a7);color:#fff;box-shadow:0 2px 8px rgba(0,188,212,0.3)}
+.btn-primary:hover{box-shadow:0 4px 15px rgba(0,188,212,0.4)}
+.btn-sm{padding:3px 10px;font-size:11px}
+.btn-danger{background:transparent;color:var(--danger);border:1px solid var(--danger)}
+.modal-bg{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;justify-content:center;align-items:flex-start;padding-top:30px;overflow-y:auto}
+.modal-bg.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:12px;width:90%;max-width:800px;padding:24px;box-shadow:0 8px 40px rgba(0,0,0,0.6);margin-bottom:30px}
+.modal h2{color:var(--accent);margin-bottom:16px;font-size:18px}
+.form-row{display:flex;gap:12px;margin-bottom:12px}
+.form-group{flex:1}
+.form-group label{display:block;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:8px;background:var(--input);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;outline:none}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent)}
+.section-hdr{background:linear-gradient(90deg,rgba(0,229,255,0.12),transparent);padding:6px 12px;border-radius:4px;margin:16px 0 12px;font-weight:600;font-size:12px;color:var(--accent);border-left:3px solid var(--accent);text-transform:uppercase;letter-spacing:0.5px}
+.detail-section{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:12px;margin-bottom:10px}
+.detail-section h4{font-size:12px;font-weight:600;margin-bottom:6px}
+.metrics-row{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-top:12px}
+.metric{text-align:center}.metric .val{font-size:18px;font-weight:700}.metric .lbl{font-size:10px;color:var(--dim)}
+</style>
+
+<div class="filters">
+  <button class="btn btn-primary" onclick="openForm()">🚀 New Initiative</button>
+  <span style="color:var(--border)">|</span>
+  <span class="pill on" onclick="filterAll(this)">All</span>
+  {% for s in options.statuses %}<span class="pill" data-filter="status" data-val="{{s}}" onclick="toggleFilter(this)">{{s}}</span>{% endfor %}
+  <span style="color:var(--border)">|</span>
+  {% for p in options.platforms %}<span class="pill" data-filter="platform" data-val="{{p}}" onclick="toggleFilter(this)">{{p}}</span>{% endfor %}
+  <span style="color:var(--border)">|</span>
+  <span class="pill" data-filter="is_chatbot" data-val="Yes" onclick="toggleFilter(this)">🤖 Chatbot</span>
+</div>
+<div style="display:flex;gap:8px;margin-bottom:12px">
+  <input class="search-box" id="searchBox" placeholder="Search initiatives..." oninput="applyFilters()">
+  <a class="btn btn-primary" href="#" onclick="exportCSV();return false" style="text-decoration:none;display:flex;align-items:center">📥 CSV</a>
+</div>
+<div id="count" style="color:var(--dim);font-size:12px;margin-bottom:8px"></div>
+<div class="grid" id="grid"></div>
+
+<!-- Detail Modal -->
+<div class="modal-bg" id="detailModal"><div class="modal" id="detailContent"></div></div>
+<!-- Form Modal -->
+<div class="modal-bg" id="formModal"><div class="modal"><h2 id="formTitle">🚀 New AI Initiative</h2>
+<form id="caseForm" onsubmit="return saveCase(event)">
+<input type="hidden" id="editId">
+<div class="section-hdr">ℹ️ Basic Information</div>
+<div class="form-row">
+  <div class="form-group"><label>Initiative Name *</label><input name="use_case_title" required></div>
+  <div class="form-group"><label>Owner</label><input value="{{user}}" disabled></div>
+  <div class="form-group"><label>Job Level</label><select name="job_level"><option value="">Select</option>{% for l in options.job_levels %}<option>{{l}}</option>{% endfor %}</select></div>
+</div>
+<div class="form-row">
+  <div class="form-group"><label>Program *</label><select name="program_team" required><option value="">Select</option>{% for p in options.programs_teams %}<option>{{p}}</option>{% endfor %}</select></div>
+  <div class="form-group"><label>AI Technique *</label><select name="ai_technique" required><option value="">Select</option>{% for t in options.ai_techniques %}<option>{{t}}</option>{% endfor %}</select></div>
+  <div class="form-group"><label>Platform</label><select name="platform"><option value="">Select</option>{% for p in options.platforms %}<option>{{p}}</option>{% endfor %}</select></div>
+</div>
+<div class="form-row">
+  <div class="form-group"><label>Status</label><select name="status">{% for s in options.statuses %}<option>{{s}}</option>{% endfor %}</select></div>
+  <div class="form-group"><label>Dev Type</label><select name="dev_type"><option value="">Select</option>{% for d in options.dev_types %}<option>{{d}}</option>{% endfor %}</select></div>
+  <div class="form-group"><label>Is Chatbot</label><select name="is_chatbot"><option value="">Select</option>{% for c in options.is_chatbot %}<option>{{c}}</option>{% endfor %}</select></div>
+</div>
+<div class="section-hdr">📋 Project Details</div>
+<div class="form-row">
+  <div class="form-group"><label>Problem Statement *</label><textarea name="problem_statement" rows="3" required></textarea></div>
+  <div class="form-group"><label>Proposed Solution</label><textarea name="solution_description" rows="3"></textarea></div>
+  <div class="form-group"><label>Impact Expected</label><textarea name="output_outcome" rows="3"></textarea></div>
+</div>
+<div class="form-row"><div class="form-group"><label>Tools / Services</label><input name="tools_services"></div><div class="form-group"><label>Key Prompts</label><input name="key_prompts"></div></div>
+<div class="section-hdr">📊 Impact & Benefits</div>
+<div class="form-row">
+  <div class="form-group"><label>Time Saved %</label><input name="time_saved" type="number" step="0.1"></div>
+  <div class="form-group"><label>HC Saved/yr</label><input name="yearly_hc_saved" type="number" step="0.1"></div>
+  <div class="form-group"><label>Accuracy %</label><input name="accuracy" type="number" step="0.1"></div>
+  <div class="form-group"><label>Cost Red. %</label><input name="cost_reduction" type="number" step="0.1"></div>
+  <div class="form-group"><label>USD Saved/yr</label><input name="yearly_usd_saved" type="number" step="1"></div>
+  <div class="form-group"><label>Dev Hours</label><input name="dev_time_hours" type="number" step="1"></div>
+</div>
+<div class="form-row">
+  <div class="form-group"><label>Scalability (1-10)</label><input name="scalability_score" type="number" min="1" max="10" value="5"></div>
+  <div class="form-group"><label>Innovation (1-10)</label><input name="innovation_score" type="number" min="1" max="10" value="5"></div>
+</div>
+<div style="display:flex;gap:8px;margin-top:12px">
+  <button type="submit" class="btn btn-primary">Save</button>
+  <button type="button" class="btn" style="background:var(--border);color:var(--text)" onclick="closeForm()">Cancel</button>
+</div>
+</form></div></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const CASES={{cases|tojson}};const USER="{{user}}";const ROLE="{{role}}";
+let filters={};
+const statusColors={"Developing":"var(--accent)","UAT":"var(--warn)","In Production":"var(--success)"};
+
+function renderCards(list){
+  const g=document.getElementById("grid");
+  document.getElementById("count").textContent=`📋 ${list.length} initiatives found`;
+  g.innerHTML=list.map(c=>`<div class="init-card" onclick="showDetail('${c.id}')">
+    <div style="display:flex;justify-content:space-between;margin-bottom:6px">
+      <div>${c.platform?`<span class="tag" style="background:rgba(0,229,255,0.2);color:var(--accent)">${c.platform}</span>`:''}${c.dev_type?`<span class="tag" style="background:rgba(255,193,7,0.2);color:var(--accent2)">${c.dev_type}</span>`:''}${c.is_chatbot==='Yes'?'<span class="tag" style="background:rgba(0,230,118,0.2);color:var(--success)">🤖</span>':''}</div>
+      <span class="tag" style="background:${statusColors[c.status]||'#999'};color:#fff">${c.status||''}</span>
+    </div>
+    <div style="font-size:14px;font-weight:bold;margin-bottom:4px">${c.use_case_title||''}</div>
+    <div style="font-size:11px;color:var(--dim);height:30px;overflow:hidden">${c.problem_statement||''}</div>
+    <div style="margin-top:6px">${c.ai_technique?`<span class="tag" style="background:rgba(0,229,255,0.15);color:var(--accent)">${c.ai_technique}</span>`:''}<span class="tag" style="background:rgba(255,193,7,0.15);color:var(--accent2)">${c.program_team||''}</span></div>
+    <div style="display:flex;gap:12px;margin-top:8px;font-size:11px;color:var(--dim)">
+      <span>👤 ${c.owner_login||''}</span>
+      <span>${c.yearly_usd_saved?'💰 $'+Number(c.yearly_usd_saved).toLocaleString():'💰 N/A'}</span>
+      <span>${c.time_saved?'⏱ '+c.time_saved+'%':'⏱ N/A'}</span>
+    </div>
+    ${(ROLE==='admin'||c.owner_login===USER)?`<div style="margin-top:6px;display:flex;gap:4px" onclick="event.stopPropagation()">
+      <button class="btn btn-sm" style="color:var(--accent);border:1px solid var(--border);background:transparent" onclick="editCase('${c.id}')">Edit</button>
+      <button class="btn btn-sm btn-danger" onclick="delCase('${c.id}')">Del</button>
+    </div>`:''}</div>`).join('');
+}
+
+function applyFilters(){
+  const search=(document.getElementById("searchBox").value||"").toLowerCase();
+  let list=CASES.filter(c=>{
+    for(let[k,v] of Object.entries(filters)){if(c[k]!==v)return false}
+    if(search&&!(c.use_case_title||'').toLowerCase().includes(search)&&!(c.owner_login||'').toLowerCase().includes(search)&&!(c.program_team||'').toLowerCase().includes(search)&&!(c.ai_technique||'').toLowerCase().includes(search)&&!(c.problem_statement||'').toLowerCase().includes(search))return false;
+    return true;
+  });
+  renderCards(list);
+}
+
+function toggleFilter(el){
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('on'));
+  const f=el.dataset.filter,v=el.dataset.val;
+  if(filters[f]===v){delete filters[f]}else{filters={};filters[f]=v;el.classList.add('on')}
+  applyFilters();
+}
+function filterAll(el){filters={};document.querySelectorAll('.pill').forEach(p=>p.classList.remove('on'));el.classList.add('on');applyFilters()}
+
+function showDetail(id){
+  const c=CASES.find(x=>x.id===id);if(!c)return;
+  const canEdit=ROLE==='admin'||c.owner_login===USER;
+  document.getElementById("detailContent").innerHTML=`
+    <div style="display:flex;justify-content:space-between"><h2>${c.use_case_title}</h2><button class="btn btn-sm" style="color:var(--dim);border:1px solid var(--border);background:transparent" onclick="document.getElementById('detailModal').classList.remove('show')">✕</button></div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0">
+      <div><div style="color:var(--dim);font-size:10px">Owner</div>${c.owner_login||'-'}</div>
+      <div><div style="color:var(--dim);font-size:10px">Program</div>${c.program_team||'-'}</div>
+      <div><div style="color:var(--dim);font-size:10px">Technique</div><span style="color:var(--accent)">${c.ai_technique||'-'}</span></div>
+      <div><div style="color:var(--dim);font-size:10px">Status</div><span class="tag" style="background:${statusColors[c.status]||'#999'};color:#fff">${c.status||'-'}</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px">
+      <div><div style="color:var(--dim);font-size:10px">Platform</div>${c.platform||'-'}</div>
+      <div><div style="color:var(--dim);font-size:10px">Dev Type</div>${c.dev_type||'-'}</div>
+      <div><div style="color:var(--dim);font-size:10px">Chatbot</div>${c.is_chatbot||'-'}</div>
+    </div>
+    <div class="detail-section"><h4 style="color:var(--accent)">📋 Problem Statement</h4><div style="white-space:pre-wrap">${c.problem_statement||'-'}</div></div>
+    <div class="detail-section"><h4 style="color:var(--accent2)">💡 Solution Description</h4><div style="white-space:pre-wrap">${c.solution_description||'-'}</div></div>
+    <div class="detail-section"><h4 style="color:var(--success)">📈 Impact Expected</h4><div style="white-space:pre-wrap">${c.output_outcome||'-'}</div></div>
+    ${c.tools_services?`<div style="margin:8px 0;font-size:12px"><span style="color:var(--dim)">Tools:</span> ${c.tools_services}</div>`:''}
+    <div class="metrics-row">
+      <div class="metric"><div class="val" style="color:var(--accent)">${c.time_saved!=null?c.time_saved+'%':'-'}</div><div class="lbl">Time Saved</div></div>
+      <div class="metric"><div class="val" style="color:var(--success)">${c.yearly_hc_saved!=null?c.yearly_hc_saved:'-'}</div><div class="lbl">HC/yr</div></div>
+      <div class="metric"><div class="val" style="color:var(--accent2)">${c.accuracy!=null?c.accuracy+'%':'-'}</div><div class="lbl">Accuracy</div></div>
+      <div class="metric"><div class="val" style="color:var(--accent2)">${c.yearly_usd_saved!=null?'$'+Number(c.yearly_usd_saved).toLocaleString():'-'}</div><div class="lbl">USD/yr</div></div>
+      <div class="metric"><div class="val" style="color:var(--accent)">${c.dev_time_hours!=null?c.dev_time_hours+'h':'-'}</div><div class="lbl">Dev Hrs</div></div>
+      <div class="metric"><div class="val" style="color:var(--danger)">${c.cost_reduction!=null?c.cost_reduction+'%':'-'}</div><div class="lbl">Cost Red.</div></div>
+    </div>
+    ${canEdit?`<div style="margin-top:12px"><button class="btn btn-primary" onclick="document.getElementById('detailModal').classList.remove('show');editCase('${c.id}')">✏️ Edit</button></div>`:''}`;
+  document.getElementById("detailModal").classList.add("show");
+}
+
+function openForm(){document.getElementById("editId").value="";document.getElementById("formTitle").textContent="🚀 New AI Initiative";document.getElementById("caseForm").reset();document.getElementById("formModal").classList.add("show")}
+function closeForm(){document.getElementById("formModal").classList.remove("show")}
+function editCase(id){
+  const c=CASES.find(x=>x.id===id);if(!c)return;
+  document.getElementById("editId").value=id;
+  document.getElementById("formTitle").textContent="✏️ Edit Initiative";
+  const f=document.getElementById("caseForm");
+  for(let[k,v] of Object.entries(c)){const el=f.elements[k];if(el&&v!=null)el.value=v}
+  document.getElementById("formModal").classList.add("show");
+}
+async function saveCase(e){
+  e.preventDefault();const f=new FormData(document.getElementById("caseForm"));const data=Object.fromEntries(f);
+  const id=document.getElementById("editId").value;
+  const url=id?`api/cases/${id}`:'api/cases';
+  const method=id?'PUT':'POST';
+  try{const r=await fetch(url,{method,headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});
+    if(!r.ok){const err=await r.json();alert(err.detail||"Error");return false}
+    location.reload();
+  }catch(e){alert("Error: "+e.message)}return false;
+}
+async function delCase(id){if(!confirm("Delete?"))return;await fetch(`./api/cases/${id}`,{method:"DELETE"});location.reload()}
+
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show')}));
+function exportCSV(){
+  const cases=CASES;
+  const headers=["Title","Owner","Job Level","Program","AI Technique","Platform","Dev Type","Chatbot","Status","Problem Statement","Solution Description","Impact Expected","Tools/Services","Key Prompts","Time Saved %","Yearly HC Saved","Accuracy %","Cost Reduction %","Yearly USD Saved","Dev Time Hours","Scalability Score","Innovation Score","Date Created"];
+  const rows=cases.map(c=>[c.use_case_title,c.owner_login,c.job_level,c.program_team,c.ai_technique,c.platform,c.dev_type,c.is_chatbot,c.status,c.problem_statement,c.solution_description,c.output_outcome,c.tools_services,c.key_prompts,c.time_saved,c.yearly_hc_saved,c.accuracy,c.cost_reduction,c.yearly_usd_saved,c.dev_time_hours,c.scalability_score,c.innovation_score,c.date_created].map(v=>v!=null?`"${String(v).replace(/"/g,'""')}"`:'""').join(','));
+  const csv=[headers.join(','),...rows].join('\n');
+  const blob=new Blob(['\ufeff'+csv],{type:'text/csv;charset=utf-8'});
+  const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='ai_initiatives.csv';a.click();URL.revokeObjectURL(url);
+}
+applyFilters();
+</script>
+{% endblock %}
+

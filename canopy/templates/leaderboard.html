@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.weight-row{display:flex;gap:16px;align-items:center;margin-bottom:16px}
+.weight-group{flex:1}
+.weight-group label{display:block;color:var(--dim);font-size:11px;margin-bottom:4px}
+.weight-group input[type=range]{width:100%;accent-color:var(--accent)}
+.rank-table{width:100%;border-collapse:collapse;font-size:13px}
+.rank-table th{background:#0a1525;color:var(--accent);padding:8px;text-align:left;border-bottom:2px solid var(--border)}
+.rank-table td{padding:6px 8px;border-bottom:1px solid rgba(15,52,96,0.5)}
+.rank-table tr:hover td{background:rgba(0,229,255,0.04)}
+.medal{font-size:16px;font-weight:bold}
+.analysis-modal{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:1000;justify-content:center;align-items:flex-start;padding-top:40px}
+.analysis-modal.show{display:flex}
+.analysis-box{background:var(--card);border:1px solid var(--border);border-radius:12px;width:90%;max-width:600px;padding:24px}
+.analysis-section{margin-bottom:12px}
+.analysis-section h4{font-size:13px;font-weight:600;margin-bottom:4px}
+.analysis-section ul{padding-left:16px;font-size:12px;color:var(--text)}
+</style>
+<div class="card">
+  <div class="card-title">⚖️ Adjust Weights</div>
+  <div class="weight-row">
+    <div class="weight-group"><label>Impact (<span id="wI">40</span>%)</label><input type="range" min="0" max="100" value="40" id="sI" oninput="document.getElementById('wI').textContent=this.value;updateTotal()"></div>
+    <div class="weight-group"><label>Scalability (<span id="wS">25</span>%)</label><input type="range" min="0" max="100" value="25" id="sS" oninput="document.getElementById('wS').textContent=this.value;updateTotal()"></div>
+    <div class="weight-group"><label>Effort (<span id="wE">20</span>%)</label><input type="range" min="0" max="100" value="20" id="sE" oninput="document.getElementById('wE').textContent=this.value;updateTotal()"></div>
+    <div class="weight-group"><label>Innovation (<span id="wN">15</span>%)</label><input type="range" min="0" max="100" value="15" id="sN" oninput="document.getElementById('wN').textContent=this.value;updateTotal()"></div>
+    <div style="text-align:center;min-width:80px"><div id="totalPct" style="font-size:20px;font-weight:bold">100%</div><div id="totalMsg" style="font-size:10px">✓ Balanced</div>
+      <button class="btn btn-primary btn-sm" style="margin-top:4px" id="refreshBtn" onclick="loadRankings()">Refresh</button></div>
+  </div>
+</div>
+<div class="card"><div class="card-title">🏆 Leaderboard</div><div id="rankTable"></div></div>
+<div class="analysis-modal" id="analysisModal" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="analysis-box" id="analysisContent"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+const medals={1:"🏆",2:"🥈",3:"🥉"};const mColors={1:"#FFD700",2:"#C0C0C0",3:"#CD7F32"};
+function updateTotal(){
+  const t=+document.getElementById("sI").value+ +document.getElementById("sS").value+ +document.getElementById("sE").value+ +document.getElementById("sN").value;
+  const ok=t===100;
+  document.getElementById("totalPct").textContent=t+"%";document.getElementById("totalPct").style.color=ok?"var(--success)":"var(--danger)";
+  document.getElementById("totalMsg").textContent=ok?"✓ Balanced":"Must = 100%";document.getElementById("totalMsg").style.color=ok?"var(--success)":"var(--danger)";
+  document.getElementById("refreshBtn").disabled=!ok;
+}
+async function loadRankings(){
+  const q=`impact_w=${document.getElementById("sI").value}&scalability_w=${document.getElementById("sS").value}&effort_w=${document.getElementById("sE").value}&innovation_w=${document.getElementById("sN").value}`;
+  const data=await fetch(`./api/rankings?${q}`).then(r=>r.json());
+  document.getElementById("rankTable").innerHTML=`<table class="rank-table"><thead><tr><th>#</th><th>Title</th><th>Owner</th><th>Score</th><th>Impact</th><th>Scale</th><th>Effort</th><th>Innov</th><th>USD/yr</th><th></th></tr></thead><tbody>${data.map(r=>`<tr>
+    <td><span class="medal" style="color:${mColors[r.rank]||'var(--text)'}">${medals[r.rank]||''} ${r.rank}</span></td>
+    <td>${r.use_case_title||''}</td><td>${r.owner_login||''}</td>
+    <td style="font-weight:bold;color:${r.composite_score>=70?'var(--success)':r.composite_score>=40?'var(--warn)':'var(--danger)'}">${r.composite_score}</td>
+    <td>${r.impact_score}</td><td>${r.scalability_score_calc}</td><td>${r.effort_score}</td><td>${r.innovation_score_calc}</td>
+    <td>${r.yearly_usd_saved?'$'+Number(r.yearly_usd_saved).toLocaleString():'-'}</td>
+    <td><button class="btn btn-sm" style="color:var(--accent);border:1px solid var(--border);background:transparent" onclick="analyze('${r.id}','${(r.use_case_title||'').replace(/'/g,"\\'")}')">AI Analysis</button></td>
+  </tr>`).join('')}</tbody></table>`;
+}
+async function analyze(id,title){
+  document.getElementById("analysisContent").innerHTML=`<h2 style="color:var(--accent)">${title}</h2><div style="color:var(--dim)">Analyzing...</div>`;
+  document.getElementById("analysisModal").classList.add("show");
+  const data=await fetch(`./api/rankings/${id}/ai-analysis`,{method:"POST"}).then(r=>r.json());
+  document.getElementById("analysisContent").innerHTML=`<div style="display:flex;justify-content:space-between"><h2 style="color:var(--accent)">${title}</h2><button class="btn btn-sm" style="color:var(--dim);border:1px solid var(--border);background:transparent" onclick="document.getElementById('analysisModal').classList.remove('show')">✕</button></div>
+    <div style="background:rgba(0,229,255,0.08);padding:10px;border-radius:6px;margin:12px 0;color:var(--accent);font-weight:bold">${data.summary}</div>
+    <div class="analysis-section"><h4 style="color:var(--success)">💪 Strengths</h4><ul>${(data.strengths||[]).map(s=>`<li>${s}</li>`).join('')}</ul></div>
+    <div class="analysis-section"><h4 style="color:var(--warn)">⚠️ Weaknesses</h4><ul>${(data.weaknesses||[]).map(s=>`<li>${s}</li>`).join('')}</ul></div>
+    <div class="analysis-section"><h4 style="color:var(--accent)">💡 Suggestions</h4><ul>${(data.suggestions||[]).map(s=>`<li>${s}</li>`).join('')}</ul></div>
+    <div class="analysis-section"><h4 style="color:var(--danger)">🔴 Risks</h4><ul>${(data.risks||[]).map(s=>`<li>${s}</li>`).join('')}</ul></div>`;
+}
+loadRankings();
+</script>
+{% endblock %}
+

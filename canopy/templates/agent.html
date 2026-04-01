@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block content %}
+<style>
+.chat-container{min-height:400px;max-height:500px;overflow-y:auto;padding:8px;margin-bottom:12px}
+.chat-empty{text-align:center;color:var(--dim);padding:60px}
+.msg{margin-bottom:10px;display:flex}.msg.user{justify-content:flex-end}.msg.agent{justify-content:flex-start}
+.bubble{max-width:85%;padding:10px 14px;border-radius:12px;font-size:13px;line-height:1.5}
+.msg.user .bubble{background:var(--accent);color:#fff}
+.msg.agent .bubble{background:var(--card);border:1px solid var(--border);color:var(--text)}
+.design-card{background:rgba(0,229,255,0.06);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:8px}
+.design-card h4{color:var(--accent);font-size:12px;margin-bottom:4px}
+.design-card .tag{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;margin-right:3px}
+.design-card ol{padding-left:18px;font-size:12px;color:var(--dim)}
+.chat-input{display:flex;gap:8px}
+.chat-input textarea{flex:1;padding:8px;background:var(--input);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;resize:none;outline:none}
+.chat-input textarea:focus{border-color:var(--accent)}
+</style>
+<div class="card">
+  <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+    <div class="card-title">🤖 AI Solution Design Agent</div>
+    <button class="btn btn-sm" style="color:var(--accent);border:1px solid var(--border);background:transparent" onclick="resetChat()">New Chat</button>
+  </div>
+  <div class="chat-container" id="chatBox">
+    <div class="chat-empty"><div style="font-size:40px;margin-bottom:12px">🤖</div>
+      <div>Describe your problem and I'll design an AI solution.</div>
+      <div style="font-size:11px;margin-top:8px;color:var(--border)">Example: "We need to automate invoice processing"</div>
+    </div>
+  </div>
+  <div class="chat-input">
+    <textarea id="chatInput" rows="2" placeholder="Describe your problem..." onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg()}"></textarea>
+    <button class="btn btn-primary" onclick="sendMsg()" id="sendBtn">Send</button>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+let sessionId=null;
+function addMsg(role,html){
+  const empty=document.querySelector('.chat-empty');if(empty)empty.remove();
+  const box=document.getElementById("chatBox");
+  box.innerHTML+=`<div class="msg ${role}"><div class="bubble">${html}</div></div>`;
+  box.scrollTop=box.scrollHeight;
+}
+function designHtml(d){
+  if(!d)return'';
+  let h=`<div class="design-card">`;
+  if(d.recommendation)h+=`<div style="margin-bottom:8px">${d.recommendation}</div>`;
+  if(d.technique)h+=`<div style="margin-bottom:4px"><b style="color:var(--accent)">Technique:</b> <span class="tag" style="background:rgba(0,229,255,0.2);color:var(--accent)">${d.technique}</span></div>`;
+  if(d.tools&&d.tools.length)h+=`<div style="margin-bottom:4px"><b style="color:var(--accent)">Tools:</b> ${d.tools.map(t=>`<span class="tag" style="background:var(--bg);color:var(--dim)">${t}</span>`).join('')}</div>`;
+  if(d.estimated_effort_hours)h+=`<div style="margin-bottom:4px;color:var(--dim)">⏱ ~${d.estimated_effort_hours}h estimated</div>`;
+  if(d.implementation_steps&&d.implementation_steps.length)h+=`<div><b style="color:var(--accent)">Steps:</b><ol>${d.implementation_steps.map(s=>`<li>${s}</li>`).join('')}</ol></div>`;
+  if(d.matched_cases&&d.matched_cases.length)h+=`<div><b style="color:var(--accent)">References:</b>${d.matched_cases.map(c=>`<div style="background:var(--bg);border-radius:4px;padding:4px 8px;margin-top:3px;font-size:11px"><b>${c.title}</b> — ${c.technique||''}</div>`).join('')}</div>`;
+  return h+'</div>';
+}
+async function sendMsg(){
+  const input=document.getElementById("chatInput");const q=input.value.trim();if(!q)return;
+  input.value="";addMsg("user",q);
+  document.getElementById("sendBtn").disabled=true;
+  addMsg("agent","<span style='color:var(--dim)'>Analyzing...</span>");
+  try{
+    let data;
+    if(!sessionId){
+      data=await fetch("./api/agent/design",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({query:q})}).then(r=>{if(!r.ok)throw new Error("Server error "+r.status);return r.json()});
+      sessionId=data.session_id;
+      // Remove "Analyzing..." and add design
+      const msgs=document.querySelectorAll('.msg.agent');
+      if(msgs.length)msgs[msgs.length-1].remove();
+      addMsg("agent",designHtml(data.design));
+    }else{
+      data=await fetch("./api/agent/followup",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({session_id:sessionId,question:q})}).then(r=>r.json());
+      const msgs=document.querySelectorAll('.msg.agent');
+      if(msgs.length)msgs[msgs.length-1].remove();
+      let html=data.answer||'';
+      if(data.updated_design)html+=designHtml(data.updated_design);
+      addMsg("agent",html||data.error||"No response");
+    }
+  }catch(e){
+    const msgs=document.querySelectorAll('.msg.agent');
+    if(msgs.length)msgs[msgs.length-1].remove();
+    addMsg("agent","Error: "+e.message);
+  }
+  document.getElementById("sendBtn").disabled=false;
+}
+function resetChat(){sessionId=null;document.getElementById("chatBox").innerHTML=`<div class="chat-empty"><div style="font-size:40px;margin-bottom:12px">🤖</div><div>Describe your problem and I'll design an AI solution.</div></div>`}
+</script>
+{% endblock %}
+

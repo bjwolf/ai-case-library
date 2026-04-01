@@ -280,3 +280,75 @@ Anyone on Amazon VPN: http://<instance-private-ip>/
 Create Private Hosted Zone → A record → ai-case-library.gsrc.internal → EC2 private IP
 
 ### Cost: ~$16/month (24/7) or ~$5/month (business hours only)
+
+---
+
+## Canopy Deployment (Recommended)
+
+### Overview
+Canopy is Amazon's internal app hosting platform on ECS Fargate with built-in Midway auth, persistent S3 storage, and Bedrock LLM access. Zero infrastructure management.
+
+### Canopy Version Structure
+```
+canopy/
+├── app.py              ← FastAPI entry point (port 8080, host 0.0.0.0)
+├── requirements.txt    ← fastapi, uvicorn, jinja2, boto3, pydantic
+├── constants.py        ← All dropdown options (7 lists)
+├── seed_data.py        ← Sample data (auto-seeds on first startup)
+├── ranking.py          ← Scoring engine + AI analysis
+├── agent.py            ← Solution design agent (Bedrock or keyword fallback)
+└── templates/
+    ├── base.html       ← Dark sci-fi layout (all CSS inline, zero CDN)
+    ├── browse.html     ← Card view + filters + form/detail modals
+    ├── dashboard.html  ← Stats + charts + data table
+    ├── leaderboard.html← Rankings + weight sliders + AI analysis
+    └── agent.html      ← Chat interface
+```
+
+### Key Differences from Local Version
+| Aspect | Local (backend/) | Canopy (canopy/) |
+|---|---|---|
+| Database | SQLite + SQLAlchemy | canopy_storage (S3 JSON) |
+| Auth | Custom JWT + login page | Midway SSO (automatic) |
+| Frontend | React + Ant Design (CDN) | Jinja2 + vanilla JS (no CDN) |
+| AI Agent | Keyword matching | Bedrock Claude (with fallback) |
+| AI Analysis | Rule-based | Bedrock Claude (with fallback) |
+| Port | 8000 | 8080 |
+| Entry point | backend/app/main.py | canopy/app.py |
+| Dependencies | 8 packages | 6 packages |
+
+### Canopy SDK (auto-injected, not bundled)
+- canopy_storage — persistent S3-backed key/value storage
+- canopy_llm — Amazon Bedrock Claude for AI features
+- canopy_auth — Midway user identity from headers
+- canopy_email — SES email sending
+- canopy_scheduler — background jobs
+- canopy_cache — in-memory caching with TTL
+
+### Local Testing
+```bash
+cd "AI Hackathon/canopy"
+set CANOPY_DEV_USER=guoweim
+py app.py
+# Opens on http://localhost:8080
+```
+
+### Deploy to Canopy
+```powershell
+cd "AI Hackathon/canopy"
+Compress-Archive -Path app.py, requirements.txt, constants.py, ranking.py, agent.py, seed_data.py, templates -DestinationPath canopy-deploy.zip
+```
+Upload ZIP to https://canopy.fgbs.amazon.dev
+
+### Access
+Any Amazon employee globally: https://canopy.fgbs.amazon.dev/apps/gsrc-ai-initiatives/
+Midway authenticates automatically — no login page needed.
+
+### Admin Bootstrap
+- DEFAULT_ADMINS = ["guoweim"] hardcoded in app.py
+- First visit auto-creates roles in canopy_storage
+- Admin can promote others via User Management UI
+
+### Git Branch
+- `main` branch: local version (React + SQLite)
+- `canopy` branch: Canopy version (Jinja2 + canopy_storage)
